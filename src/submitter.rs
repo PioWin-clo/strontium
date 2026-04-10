@@ -1,10 +1,11 @@
 use std::time::{Duration, Instant};
-use bs58;
 use sha2::{Digest, Sha256};
 use ed25519_dalek::{Keypair, Signer};
 use crate::consensus::ConsensusResult;
 
+#[allow(dead_code)]
 pub const PROGRAM_ID: &str = "2Z9ymNXMXjqMbDRj6NhPo7LLMaqdn2nfU1hvy19ScRAe";
+#[allow(dead_code)]
 pub const ORACLE_PDA: &str = "EtjkQqf1h9gtwHpi2QPRTefWg3XmDfmjQ6YozYZspJzn";
 pub const MEMO_PROGRAM: &str = "MemoSq4gqABAXKb96qnH8TysNcWxMyWCqXgDLGmfcHr";
 
@@ -78,6 +79,7 @@ impl RpcClient {
     }
 
     /// Check if an RPC endpoint is healthy (responds + slot is fresh)
+    #[allow(dead_code)]
     pub fn check_health(&self, url: &str) -> bool {
         let payload = r#"{"jsonrpc":"2.0","id":1,"method":"getHealth"}"#;
         match self.post_json(url, payload, 3000) {

@@ -7,13 +7,11 @@ mod register;
 
 use std::thread;
 use std::time::{Duration, SystemTime, UNIX_EPOCH};
-use bs58;
-use ed25519_dalek::Keypair;
 
-use config::{StrontiumConfig, PROGRAM_ID, ORACLE_PDA};
+use config::StrontiumConfig;
 use status::{DaemonStatus, SilentReason};
 use ntp_client::{discover_sources, query_sources_parallel, has_gps_pps};
-use consensus::{run_consensus_cycle, rotation_my_turn, window_has_submission};
+use consensus::{run_consensus_cycle, rotation_my_turn};
 use submitter::{RpcClient, build_submit_transaction, derive_registration_pda,
                 lamports_to_xnt, estimate_days_remaining};
 use register::{run_register, load_keypair};
@@ -261,7 +259,7 @@ fn run_daemon(config: StrontiumConfig) {
 
 // ─── Readiness Check ─────────────────────────────────────────────────────────
 
-fn readiness_check(config: &StrontiumConfig, oracle_pubkey: &str, rpc: &mut RpcClient) {
+fn readiness_check(config: &StrontiumConfig, _oracle_pubkey: &str, _rpc: &mut RpcClient) {
     println!("[{}] ⏳ Waiting for validator to be ready...", now_str());
 
     let vote_path = match &config.vote_keypair_path {
@@ -726,7 +724,7 @@ fn shorten(s: &str, n: usize) -> String {
 
 fn base64_encode(data: &[u8]) -> String {
     const ALPHABET: &[u8] = b"ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789+/";
-    let mut out = String::with_capacity((data.len() * 4 + 2) / 3);
+    let mut out = String::with_capacity((data.len() * 4).div_ceil(3));
     for chunk in data.chunks(3) {
         let b0 = chunk[0] as usize;
         let b1 = if chunk.len() > 1 { chunk[1] as usize } else { 0 };
@@ -735,7 +733,7 @@ fn base64_encode(data: &[u8]) -> String {
         out.push(ALPHABET[(combined >> 18) & 63] as char);
         out.push(ALPHABET[(combined >> 12) & 63] as char);
         out.push(if chunk.len() > 1 { ALPHABET[(combined >> 6) & 63] as char } else { '=' });
-        out.push(if chunk.len() > 2 { ALPHABET[(combined >> 0) & 63] as char } else { '=' });
+        out.push(if chunk.len() > 2 { ALPHABET[combined & 63] as char } else { '=' });
     }
     out
 }

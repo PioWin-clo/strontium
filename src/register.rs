@@ -1,10 +1,9 @@
 use std::io::{self, Write};
-use std::path::{Path, PathBuf};
+use std::path::Path;
 use ed25519_dalek::Keypair;
-use bs58;
 use crate::submitter::{
     RpcClient, build_register_transaction, derive_registration_pda,
-    parse_blockhash, lamports_to_xnt,
+    lamports_to_xnt,
 };
 use crate::config::StrontiumConfig;
 
@@ -253,7 +252,7 @@ fn find_bump(oracle_pubkey: &[u8; 32], program_id: &[u8; 32]) -> u8 {
 fn base64_encode(data: &[u8]) -> String {
     use std::fmt::Write;
     const ALPHABET: &[u8] = b"ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789+/";
-    let mut out = String::with_capacity((data.len() * 4 + 2) / 3);
+    let mut out = String::with_capacity((data.len() * 4).div_ceil(3));
     for chunk in data.chunks(3) {
         let b0 = chunk[0] as usize;
         let b1 = if chunk.len() > 1 { chunk[1] as usize } else { 0 };
@@ -262,7 +261,7 @@ fn base64_encode(data: &[u8]) -> String {
         out.push(ALPHABET[(combined >> 18) & 63] as char);
         out.push(ALPHABET[(combined >> 12) & 63] as char);
         out.push(if chunk.len() > 1 { ALPHABET[(combined >> 6) & 63] as char } else { '=' });
-        out.push(if chunk.len() > 2 { ALPHABET[(combined >> 0) & 63] as char } else { '=' });
+        out.push(if chunk.len() > 2 { ALPHABET[combined & 63] as char } else { '=' });
     }
     out
 }

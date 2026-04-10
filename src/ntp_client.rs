@@ -6,6 +6,7 @@ use crate::status::{NtpSourceStatus, NtpTier};
 
 /// NTP source definition with tier classification
 #[derive(Debug, Clone)]
+#[allow(dead_code)]
 pub struct NtpSource {
     pub host:    &'static str,
     pub port:    u16,
@@ -43,6 +44,7 @@ pub const NTP_SOURCES: &[NtpSource] = &[
 ];
 
 #[derive(Debug, Clone)]
+#[allow(dead_code)]
 pub struct NtpResult {
     pub host:       String,
     pub timestamp_ms: i64,
@@ -218,6 +220,7 @@ pub fn query_sources_parallel(sources: &[NtpResult]) -> Vec<NtpResult> {
 }
 
 /// Convert NtpResult to NtpSourceStatus for status.json
+#[allow(dead_code)]
 pub fn to_source_status(results: &[NtpResult], all_sources: &[NtpSource]) -> Vec<NtpSourceStatus> {
     all_sources.iter().map(|s| {
         if let Some(r) = results.iter().find(|r| r.host == s.host) {

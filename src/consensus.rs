@@ -44,7 +44,7 @@ pub fn compute_consensus(results: &[NtpResult]) -> Option<ConsensusResult> {
     let n = timestamps.len();
 
     // Median
-    let median_ms = if n % 2 == 0 {
+    let median_ms = if n.is_multiple_of(2) {
         let a = timestamps[n/2 - 1];
         let b = timestamps[n/2];
         a.checked_add(b).map(|s| s / 2).unwrap_or(a)
@@ -188,6 +188,7 @@ fn simple_hash(data: &[u8]) -> u64 {
 
 /// Check if a submission was already made for this window
 /// (anti-dublet: don't submit if fallback already covered this window)
+#[allow(dead_code)]
 pub fn window_has_submission(last_submit_ts_ms: Option<i64>, interval_s: u64) -> bool {
     match last_submit_ts_ms {
         None => false,
