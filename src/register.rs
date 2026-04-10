@@ -82,7 +82,7 @@ pub fn run_register(config: &mut StrontiumConfig) -> Result<(), String> {
     println!("\n⏳ Sending registration transaction...");
     println!("   (requires both oracle + vote signatures)");
 
-    let rpc_url = rpc.active_url()
+    let _rpc_url = rpc.active_url()
         .ok_or("No healthy RPC endpoint")?
         .to_string();
 
@@ -98,7 +98,6 @@ pub fn run_register(config: &mut StrontiumConfig) -> Result<(), String> {
     );
 
     // Encode to base64
-    use std::io::Read;
     let tx_b64 = base64_encode(&tx);
 
     // Send
@@ -250,7 +249,6 @@ fn find_bump(oracle_pubkey: &[u8; 32], program_id: &[u8; 32]) -> u8 {
 }
 
 fn base64_encode(data: &[u8]) -> String {
-    use std::fmt::Write;
     const ALPHABET: &[u8] = b"ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789+/";
     let mut out = String::with_capacity((data.len() * 4).div_ceil(3));
     for chunk in data.chunks(3) {

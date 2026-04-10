@@ -8,7 +8,7 @@ mod register;
 use std::thread;
 use std::time::{Duration, SystemTime, UNIX_EPOCH};
 
-use config::StrontiumConfig;
+use config::{StrontiumConfig, ORACLE_PDA};
 use status::{DaemonStatus, SilentReason};
 use ntp_client::{discover_sources, query_sources_parallel, has_gps_pps};
 use consensus::{run_consensus_cycle, rotation_my_turn};
