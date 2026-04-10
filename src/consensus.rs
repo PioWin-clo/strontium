@@ -134,57 +134,46 @@ pub fn run_consensus_cycle(ntp_results: &[NtpResult]) -> Option<ConsensusResult>
 }
 
 /// Determine if it's this operator's turn to submit (window_id rotation)
-/// Returns (is_my_turn, window_id, seconds_until_next_turn)
+/// 
+/// Algorithm:
+///   primary_index = window_id % n_validators
+///   my_index = position of my pubkey in sorted committee list
+///   → fair round-robin: each operator submits every N windows
+///
+/// Staged fallback (anti-dublet):
+///   t+0s  → primary (primary_index == my_index)
+///   t+20s → backup-1 (next in list) if primary silent
+///   t+40s → backup-2 if still silent
+///
+/// Returns (is_my_turn, window_id, seconds_until_next_window)
 pub fn rotation_my_turn(
-    my_pubkey_bytes: &[u8; 32],
+    _my_pubkey_bytes: &[u8; 32],
+    my_index: usize,
     n_validators: usize,
     interval_s: u64,
 ) -> (bool, u64, u64) {
-    if n_validators == 0 {
+    if n_validators <= 1 {
         return (true, 0, interval_s);
     }
 
-    let now_s      = get_system_clock_ms() / 1000;
-    let window_id  = (now_s as u64) / interval_s;
-
-    // Deterministic leader: H(window_id || committee_root) % n
-    // Simple hash using pubkey bytes + window_id
-    let mut hash_input = [0u8; 40];
-    hash_input[..32].copy_from_slice(my_pubkey_bytes);
-    hash_input[32..].copy_from_slice(&window_id.to_le_bytes());
-
-    // Simple hash (use sha2 for production)
-    let hash_val = simple_hash(&hash_input);
-    let my_index = hash_val % n_validators as u64;
-
-    // For now with n_validators from config — actual index from sorted validator list
-    // In daemon this will be called with actual sorted list position
-    let is_primary = my_index == 0;
-
+    let now_s               = get_system_clock_ms() / 1000;
+    let window_id           = (now_s as u64) / interval_s;
     let window_secs_elapsed = (now_s as u64) % interval_s;
     let window_secs_remain  = interval_s - window_secs_elapsed;
 
-    // Staged backup: primary at t=0, backup1 at t+20s, backup2 at t+40s
-    let is_my_turn = if n_validators == 1 {
-        true
-    } else {
-        is_primary
-        || (my_index == 1 && window_secs_elapsed >= 20)
-        || (my_index == 2 && window_secs_elapsed >= 40)
-    };
+    // Deterministyczna rotacja: window_id % n == mój_indeks
+    let primary_index = (window_id % n_validators as u64) as usize;
+    let backup1_index = (primary_index + 1) % n_validators;
+    let backup2_index = (primary_index + 2) % n_validators;
+
+    let is_my_turn =
+        my_index == primary_index
+        || (my_index == backup1_index && window_secs_elapsed >= 20)
+        || (my_index == backup2_index && window_secs_elapsed >= 40);
 
     (is_my_turn, window_id, window_secs_remain)
 }
 
-/// Simple hash for rotation (not cryptographic — just deterministic)
-fn simple_hash(data: &[u8]) -> u64 {
-    let mut h: u64 = 14695981039346656037;
-    for &b in data {
-        h = h.wrapping_mul(1099511628211);
-        h ^= b as u64;
-    }
-    h
-}
 
 /// Check if a submission was already made for this window
 /// (anti-dublet: don't submit if fallback already covered this window)

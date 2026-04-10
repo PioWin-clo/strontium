@@ -202,10 +202,17 @@ fn run_daemon(config: StrontiumConfig) {
         }
 
         // Rotation check — is it my turn?
-        // For now n_validators=1 until we implement on-chain committee reading
-        let n_validators = 1usize; // TODO: read from on-chain in future version
+        // committee = sorted list of oracle pubkeys from config
+        // Empty committee = solo mode (always my turn)
+        let n_validators = if config.committee.is_empty() { 1 } else { config.committee.len() };
+        let my_index = if config.committee.is_empty() {
+            0usize
+        } else {
+            config.committee.iter().position(|p| p == &oracle_pubkey).unwrap_or(0)
+        };
         let (is_my_turn, window_id, _) = rotation_my_turn(
             &oracle_bytes,
+            my_index,
             n_validators,
             config.interval_s,
         );

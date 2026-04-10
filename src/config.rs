@@ -34,6 +34,10 @@ pub struct StrontiumConfig {
 
     /// Dry run mode — NTP consensus without submitting TX
     pub dry_run: bool,
+
+    /// Committee: sorted list of oracle pubkeys for rotation
+    /// Empty = solo mode (always my turn)
+    pub committee: Vec<String>,
 }
 
 impl Default for StrontiumConfig {
@@ -52,6 +56,7 @@ impl Default for StrontiumConfig {
             alert_webhook: None,
             alert_balance_threshold: 1.0,
             dry_run: false,
+            committee: vec![],
         }
     }
 }
@@ -110,6 +115,16 @@ impl StrontiumConfig {
             "dry_run" => {
                 self.dry_run = value == "true" || value == "1";
             }
+            "committee" => {
+                // Add a pubkey to committee list
+                if !self.committee.contains(&value.to_string()) {
+                    self.committee.push(value.to_string());
+                    self.committee.sort();
+                }
+            }
+            "committee_clear" => {
+                self.committee.clear();
+            }
             _ => return Err(format!("Unknown config key: {}", key)),
         }
         Ok(())
@@ -131,6 +146,14 @@ impl StrontiumConfig {
         println!("  alert_webhook  : {}", self.alert_webhook.as_deref().unwrap_or("not set"));
         println!("  alert_balance  : {} XNT", self.alert_balance_threshold);
         println!("  dry_run        : {}", self.dry_run);
+        if !self.committee.is_empty() {
+            println!("  committee      : {} oracles", self.committee.len());
+            for (i, p) in self.committee.iter().enumerate() {
+                println!("    [{}] {}", i, p);
+            }
+        } else {
+            println!("  committee      : solo mode");
+        }
     }
 }
 
