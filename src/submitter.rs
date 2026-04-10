@@ -1,6 +1,6 @@
 use std::time::{Duration, Instant};
 use sha2::{Digest, Sha256};
-use ed25519_dalek::{Keypair, Signer};
+use ed25519_dalek::{SigningKey, Signer};
 use crate::consensus::ConsensusResult;
 
 #[allow(dead_code)]
@@ -193,7 +193,7 @@ impl RpcClient {
 
 /// Build and sign a submit_time transaction with embedded Memo
 pub fn build_submit_transaction(
-    keypair:       &Keypair,
+    keypair:       &SigningKey,
     program_id:    &[u8; 32],
     oracle_pda:    &[u8; 32],
     reg_pda:       &[u8; 32],
@@ -201,7 +201,7 @@ pub fn build_submit_transaction(
     consensus:     &ConsensusResult,
     window_id:     u64,
 ) -> Vec<u8> {
-    let oracle_pubkey: [u8; 32] = keypair.public.to_bytes();
+    let oracle_pubkey: [u8; 32] = keypair.verifying_key().to_bytes();
 
     // Build submit_time instruction data
     let discriminator = compute_discriminator("submit_time");
@@ -300,13 +300,13 @@ fn build_message_two_instructions(
 // ─── Registration Transaction ─────────────────────────────────────────────────
 
 pub fn build_register_transaction(
-    oracle_keypair: &Keypair,
-    vote_keypair:   &Keypair,
+    oracle_keypair: &SigningKey,
+    vote_keypair:   &SigningKey,
     program_id:     &[u8; 32],
     blockhash:      &[u8; 32],
 ) -> Vec<u8> {
-    let oracle_pubkey:    [u8; 32] = oracle_keypair.public.to_bytes();
-    let vote_pubkey:      [u8; 32] = vote_keypair.public.to_bytes();
+    let oracle_pubkey:    [u8; 32] = oracle_keypair.verifying_key().to_bytes();
+    let vote_pubkey:      [u8; 32] = vote_keypair.verifying_key().to_bytes();
     let reg_pda = derive_registration_pda(&oracle_pubkey, program_id);
     let system_prog = [0u8; 32]; // system program
 

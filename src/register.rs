@@ -1,6 +1,6 @@
 use std::io::{self, Write};
 use std::path::Path;
-use ed25519_dalek::Keypair;
+use ed25519_dalek::SigningKey;
 use crate::submitter::{
     RpcClient, build_register_transaction, derive_registration_pda,
     lamports_to_xnt,
@@ -19,7 +19,7 @@ pub fn run_register(config: &mut StrontiumConfig) -> Result<(), String> {
     // Load oracle keypair
     let oracle_kp = load_keypair(&config.keypair_path)
         .map_err(|e| format!("Oracle keypair error: {}", e))?;
-    let oracle_pubkey = bs58::encode(oracle_kp.public.to_bytes()).into_string();
+    let oracle_pubkey = bs58::encode(oracle_kp.verifying_key().to_bytes()).into_string();
 
     println!("  Oracle keypair : {}", oracle_pubkey);
 
@@ -27,7 +27,7 @@ pub fn run_register(config: &mut StrontiumConfig) -> Result<(), String> {
     let vote_path = resolve_vote_keypair_path(config)?;
     let vote_kp   = load_keypair(&vote_path)
         .map_err(|e| format!("Vote keypair error: {}", e))?;
-    let vote_pubkey = bs58::encode(vote_kp.public.to_bytes()).into_string();
+    let vote_pubkey = bs58::encode(vote_kp.verifying_key().to_bytes()).into_string();
 
     println!("  Vote keypair   : {}", vote_pubkey);
     println!("  Program ID     : {}", config.program_id);
@@ -67,7 +67,7 @@ pub fn run_register(config: &mut StrontiumConfig) -> Result<(), String> {
     let program_id_arr: [u8; 32] = program_id_bytes.try_into()
         .map_err(|_| "Program ID wrong length".to_string())?;
 
-    let oracle_bytes: [u8; 32] = oracle_kp.public.to_bytes();
+    let oracle_bytes: [u8; 32] = oracle_kp.verifying_key().to_bytes();
     let reg_pda_bytes = derive_registration_pda(&oracle_bytes, &program_id_arr);
     let reg_pda = bs58::encode(reg_pda_bytes).into_string();
 
@@ -202,7 +202,7 @@ fn resolve_vote_keypair_path(config: &StrontiumConfig) -> Result<String, String>
 }
 
 /// Load an ed25519 keypair from a JSON file (Solana format: [u8; 64])
-pub fn load_keypair(path: &str) -> Result<Keypair, String> {
+pub fn load_keypair(path: &str) -> Result<SigningKey, String> {
     let data = std::fs::read_to_string(path)
         .map_err(|e| format!("Cannot read {}: {}", path, e))?;
 
@@ -214,8 +214,9 @@ pub fn load_keypair(path: &str) -> Result<Keypair, String> {
         return Err(format!("Keypair must be 64 bytes, got {} in {}", bytes.len(), path));
     }
 
-    Keypair::from_bytes(&bytes)
-        .map_err(|e| format!("Invalid keypair in {}: {}", path, e))
+    let secret: [u8; 32] = bytes[..32].try_into()
+        .map_err(|_| format!("Cannot read 32-byte secret from {}", path))?;
+    Ok(SigningKey::from_bytes(&secret))
 }
 
 // ─── Helpers ──────────────────────────────────────────────────────────────────

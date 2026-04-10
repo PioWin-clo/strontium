@@ -85,8 +85,8 @@ fn run_daemon(config: StrontiumConfig) {
         Err(e) => { eprintln!("✗ Keypair error: {}", e); std::process::exit(1); }
     };
 
-    let oracle_pubkey = bs58::encode(keypair.public.to_bytes()).into_string();
-    let oracle_bytes: [u8; 32] = keypair.public.to_bytes();
+    let oracle_pubkey = bs58::encode(keypair.verifying_key().to_bytes()).into_string();
+    let oracle_bytes: [u8; 32] = keypair.verifying_key().to_bytes();
 
     let program_id_bytes = bs58::decode(&config.program_id).into_vec()
         .expect("Invalid program ID");
@@ -271,7 +271,7 @@ fn readiness_check(config: &StrontiumConfig, _oracle_pubkey: &str, _rpc: &mut Rp
         Ok(kp) => kp,
         Err(_) => { return; } // Can't load, skip check
     };
-    let vote_pubkey = bs58::encode(vote_kp.public.to_bytes()).into_string();
+    let vote_pubkey = bs58::encode(vote_kp.verifying_key().to_bytes()).into_string();
 
     for attempt in 0..READINESS_MAX_TRIES {
         if is_validator_active(&vote_pubkey) {
@@ -385,7 +385,7 @@ fn cmd_balance() {
         Ok(kp) => kp,
         Err(e) => { eprintln!("✗ {}", e); return; }
     };
-    let pubkey = bs58::encode(keypair.public.to_bytes()).into_string();
+    let pubkey = bs58::encode(keypair.verifying_key().to_bytes()).into_string();
     let mut rpc = RpcClient::new(config.rpc_urls.clone());
 
     match rpc.get_balance(&pubkey) {
@@ -441,7 +441,7 @@ fn cmd_install() {
     // Check balance
     println!("Checking oracle keypair balance...");
     let keypair = load_keypair(&config.keypair_path).expect("Failed to load keypair");
-    let pubkey = bs58::encode(keypair.public.to_bytes()).into_string();
+    let pubkey = bs58::encode(keypair.verifying_key().to_bytes()).into_string();
     let mut rpc = RpcClient::new(config.rpc_urls.clone());
 
     let balance_xnt = match rpc.get_balance(&pubkey) {
