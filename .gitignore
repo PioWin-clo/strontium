@@ -1,0 +1,6 @@
+target/
+daemon/target/
+Cargo.lock
+daemon/Cargo.lock
+*.so
+*.dylib

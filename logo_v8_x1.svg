@@ -1,0 +1,60 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 400 400" width="400" height="400">
+  <!-- Background black like X1 -->
+  <rect width="400" height="400" rx="200" fill="#0b0d14"/>
+
+  <!-- Outer badge ring - X1 blue -->
+  <circle cx="200" cy="200" r="192" fill="none" stroke="#3b82f6" stroke-width="4"/>
+  <circle cx="200" cy="200" r="183" fill="none" stroke="#3b82f6" stroke-width="1" opacity="0.3"/>
+
+  <!-- Dot notches -->
+  <circle cx="200" cy="12" r="5" fill="#3b82f6"/>
+  <circle cx="200" cy="388" r="5" fill="#3b82f6"/>
+  <circle cx="12" cy="200" r="5" fill="#3b82f6"/>
+  <circle cx="388" cy="200" r="5" fill="#3b82f6"/>
+  <circle cx="74" cy="74" r="4" fill="#3b82f6" opacity="0.5"/>
+  <circle cx="326" cy="74" r="4" fill="#3b82f6" opacity="0.5"/>
+  <circle cx="74" cy="326" r="4" fill="#3b82f6" opacity="0.5"/>
+  <circle cx="326" cy="326" r="4" fill="#3b82f6" opacity="0.5"/>
+
+  <!-- Inner -->
+  <circle cx="200" cy="200" r="177" fill="#080a10"/>
+
+  <!-- Top arc text -->
+  <path id="topArc" d="M 52,200 A 148,148 0 0,1 348,200" fill="none"/>
+  <text font-family="Helvetica,Arial,sans-serif" font-size="14" font-weight="700"
+    fill="#3b82f6" letter-spacing="5">
+    <textPath href="#topArc" startOffset="10%">DECENTRALIZED • TIME ORACLE •</textPath>
+  </text>
+
+  <!-- Bottom arc text - X1 BLOCKCHAIN centered -->
+  <path id="botArc" d="M 52,200 A 148,148 0 0,0 348,200" fill="none"/>
+  <text font-family="Helvetica,Arial,sans-serif" font-size="14" font-weight="700"
+    fill="#3b82f6" letter-spacing="5">
+    <textPath href="#botArc" startOffset="50%" text-anchor="middle">X1 BLOCKCHAIN</textPath>
+  </text>
+
+  <!-- Atom orbits - blue -->
+  <ellipse cx="200" cy="186" rx="80" ry="26" fill="none" stroke="#3b82f6" stroke-width="1.5"
+    transform="rotate(-45 200 186)" opacity="0.7"/>
+  <ellipse cx="200" cy="186" rx="80" ry="26" fill="none" stroke="#3b82f6" stroke-width="1.5"
+    transform="rotate(45 200 186)" opacity="0.7"/>
+
+  <!-- Nucleus -->
+  <circle cx="200" cy="186" r="22" fill="#0b0d14" stroke="#3b82f6" stroke-width="2"/>
+
+  <!-- Sr in center - white -->
+  <text x="200" y="186" font-family="Georgia,serif" font-size="22" font-weight="700"
+    fill="#ffffff" text-anchor="middle" dominant-baseline="middle">Sr</text>
+
+  <!-- STRONTIUM - white -->
+  <text x="200" y="252" font-family="Helvetica,Arial,sans-serif" font-size="28" font-weight="900"
+    fill="#ffffff" text-anchor="middle" letter-spacing="3">STRONTIUM</text>
+
+  <!-- Divider -->
+  <line x1="90" y1="270" x2="310" y2="270" stroke="#3b82f6" stroke-width="1" opacity="0.5"/>
+  <circle cx="200" cy="270" r="3" fill="#3b82f6"/>
+
+  <!-- Atomic number - blue -->
+  <text x="200" y="294" font-family="monospace" font-size="13"
+    fill="#3b82f6" text-anchor="middle" letter-spacing="2" opacity="0.9">ATOMIC No. 38</text>
+</svg>

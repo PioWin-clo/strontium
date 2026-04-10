@@ -1,0 +1,23 @@
+[package]
+name = "strontium"
+version = "0.1.0"
+description = "X1 Strontium — decentralized time oracle"
+edition = "2021"
+
+[lib]
+crate-type = ["cdylib", "lib"]
+name = "strontium"
+
+[features]
+no-entrypoint = []
+no-idl = []
+no-log-ix-name = []
+cpi = ["no-entrypoint"]
+default = []
+
+[dependencies]
+anchor-lang = "0.31.1"
+borsh = "1.0"
+sha2 = "0.10"
+curve25519-dalek = { version = "4.1", default-features = false, features = ["alloc"] }
+bytemuck = { version = "1.13", features = ["derive", "min_const_generics"] }
