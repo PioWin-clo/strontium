@@ -208,7 +208,7 @@ pub fn build_submit_transaction(
     let mut ix_data = discriminator.to_vec();
     ix_data.extend_from_slice(&consensus.timestamp_ms.to_le_bytes());  // i64
     ix_data.extend_from_slice(&(consensus.spread_ms as i16).to_le_bytes()); // i16
-    ix_data.push((consensus.sources_used as u8).min(255));            // u8
+    ix_data.push(consensus.sources_used);            // u8
     ix_data.push((consensus.confidence * 100.0) as u8);               // u8 confidence_pct
     ix_data.push(consensus.sources_bitmap);                           // u8 sources_bitmap
 
@@ -382,7 +382,7 @@ pub fn derive_registration_pda(oracle_pubkey: &[u8; 32], program_id: &[u8; 32]) 
         let mut h = Sha256::new();
         h.update(b"reg");
         h.update(oracle_pubkey);
-        h.update(&[bump]);
+        h.update([bump]);
         h.update(program_id);
         h.update(b"ProgramDerivedAddress");
         let hash = h.finalize();

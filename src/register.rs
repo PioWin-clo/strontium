@@ -224,7 +224,7 @@ fn parse_float_field(json: &str, field: &str) -> Option<f64> {
     let key = format!("\"{}\":", field);
     let start = json.find(&key)? + key.len();
     let rest  = json[start..].trim_start();
-    let end   = rest.find(|c: char| c == ',' || c == '}' || c == ']')
+    let end   = rest.find([',', '}', ']'])
         .unwrap_or(rest.len());
     rest[..end].trim().parse::<f64>().ok()
 }
@@ -235,7 +235,7 @@ fn find_bump(oracle_pubkey: &[u8; 32], program_id: &[u8; 32]) -> u8 {
         let mut h = Sha256::new();
         h.update(b"reg");
         h.update(oracle_pubkey);
-        h.update(&[bump]);
+        h.update([bump]);
         h.update(program_id);
         h.update(b"ProgramDerivedAddress");
         let hash = h.finalize();
