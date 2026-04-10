@@ -1,67 +1,103 @@
 # ⚛️ X1 Strontium
 
-**Atomic-grade time for blockchain.**
+**Atomic-grade time for the X1 blockchain.**
 
-X1 Strontium is a decentralized NTP time oracle for the [X1 blockchain](https://x1.xyz). It provides cryptographically-attested UTC timestamps on-chain, sourced from government atomic clocks — verified by the validator network itself.
+[![CI](https://github.com/PioWin-clo/strontium/actions/workflows/test.yml/badge.svg)](https://github.com/PioWin-clo/strontium/actions/workflows/test.yml)
+[![Built on X1](https://img.shields.io/badge/Built%20on-X1-black)](https://x1.xyz)
+
+> The green CI badge above means the code builds, passes linting, and clears the security audit on every commit.
+
+🇬🇧 English | 🇵🇱 [Polski](README.pl.md)
+
+X1 Strontium is a decentralized NTP time oracle for the [X1 blockchain](https://x1.xyz). It delivers cryptographically-attested UTC timestamps on-chain, sourced from a diverse mix of atomic clocks, commercial NTP providers, and community pools — verified by the validator network itself.
 
 ---
 
 ## The Problem
 
-Every blockchain has a time problem. On Solana/X1, `Clock::unix_timestamp` is reported by the slot leader — it can be manipulated by ±1-2 seconds without detection. For most transactions this doesn't matter. But for:
+On Solana/X1, `Clock::unix_timestamp` is reported by the block leader — it can be manipulated by ±1–2 seconds without network-level detection. For most transactions this is irrelevant. But for:
 
 - **Vesting contracts** — exact payout timing
 - **Sub-second auctions** — who won?
 - **Cross-chain time proofs** — verifiable across networks
 - **Legal SLA contracts** — court-admissible timestamps
 
-...leader-reported time is a serious vulnerability.
+...leader-reported time is a serious vulnerability. X1 Strontium fixes this.
 
-## The Solution
+---
 
-Each validator runs a lightweight Strontium daemon alongside Tachyon. Every 60 seconds it:
+## How It Works
 
-1. Queries 5 atomic NTP servers from 3+ continents (PTB Germany, GUM Poland, NIST USA, NICT Japan + NTP Pool)
-2. Computes RTT-corrected offsets and checks spread (±20ms threshold)
-3. If consensus is reached → submits timestamp on-chain
-4. If sources disagree → **stays silent** (silence-as-signal)
+Each registered validator runs a lightweight Strontium daemon alongside Tachyon. Every **5 minutes** (configurable):
 
-The on-chain program aggregates submissions via median. To manipulate the result you'd need to simultaneously compromise atomic clock laboratories on 3 continents.
+1. Queries up to 17 NTP servers in parallel — atomic clocks, commercial providers, community pools from 4 continents
+2. Selects the 5 best sources by tier (GPS/PPS → NTS → Stratum-1 → Pool) and RTT
+3. Computes RTT-corrected median and validates spread (threshold: ±50ms)
+4. Calculates a **confidence score**: `source_count × 0.4 + spread_quality × 0.4 + tier_weight × 0.2`
+5. If confidence ≥ 0.60 → submits timestamp on-chain via two instructions: `submit_time` + Memo Program
+6. If sources disagree → **stays silent** (silence-as-signal = Byzantine fault protection)
+
+Each submission includes a `sources_bitmap` so every round is auditable on-chain.
+
+The on-chain program aggregates submissions into a **288-slot ring buffer** via stake-weighted median. Manipulating the result requires compromising the majority of submitters simultaneously.
+
+> **Why a mix of sources and not just government clocks?**
+> The network is decentralized — we don't want to depend on a single country or institution.
+> Each source is one vote. The median eliminates liars. More independent sources = stronger resistance.
 
 ---
 
 ## Architecture
 
 ```
-Validator Server                    X1 Blockchain
-┌─────────────────────┐            ┌──────────────────────┐
-│  Tachyon Validator  │            │                      │
-│                     │            │  OracleState PDA     │
-│  Strontium Daemon   │───submit──▶│  ┌────────────────┐  │
-│  ┌───────────────┐  │            │  │ trusted_time   │  │
-│  │ NTP Consensus │  │            │  │ spread_ms      │  │
-│  │ PTB Germany   │  │            │  │ confidence     │  │
-│  │ GUM Poland    │  │            │  │ ring_buffer    │  │
-│  │ NIST USA      │  │            │  │ [256 entries]  │  │
-│  │ NICT Japan    │  │            │  └────────────────┘  │
-│  │ NTP Pool      │  │            │                      │
-│  └───────────────┘  │            └──────────────────────┘
-└─────────────────────┘
+Validator Server                         X1 Blockchain
+┌──────────────────────────┐           ┌─────────────────────────────────┐
+│   Tachyon Validator      │           │                                 │
+│                          │           │  OracleState PDA                │
+│   Strontium Daemon       │──TX+Memo─▶│  ┌───────────────────────────┐  │
+│   ┌────────────────────┐ │           │  │  trusted_time_ms          │  │
+│   │  NTP Autodiscovery │ │           │  │  spread_ms                │  │
+│   │  ┌──────────────┐  │ │           │  │  confidence               │  │
+│   │  │ GPS/PPS  t-0 │  │ │           │  │  sources_bitmap           │  │
+│   │  │ NTS      t-1 │  │ │           │  │  ring_buffer[288]         │  │
+│   │  │ Stratum1 t-2 │  │ │           │  └───────────────────────────┘  │
+│   │  │ Pool     t-3 │  │ │           │                                 │
+│   │  └──────────────┘  │ │           │  ValidatorRegistration PDA      │
+│   │  Parallel threads  │ │           │  (TTL: 90 days, stake-checked)  │
+│   └────────────────────┘ │           │                                 │
+└──────────────────────────┘           └─────────────────────────────────┘
 ```
 
-**Key properties:**
-- Zero trust: no authority can modify the median
-- Silence-as-signal: Byzantine fault tolerance built-in
-- Permissionless: any active X1 validator can join
+Each transaction contains two instructions:
+- `submit_time` → writes to the on-chain ring buffer
+- `Memo Program` → human-readable log: `strontium:v1:w={window}:t={time}:c={confidence}:s={sources}`
+
+Every submission is visible in the explorer and fully auditable.
 
 ---
 
 ## Requirements
 
-- **OS:** Ubuntu 22.04 LTS (binary requires GLIBC 2.35+)
-- **Solana CLI:** installed and in PATH (`solana-keygen` must work)
-- **XNT balance:** ~1 XNT on oracle keypair (for registration + ~138 days of submissions)
-- **Network:** ports 123/UDP open outbound (NTP)
+| Requirement | Details |
+|---|---|
+| **OS** | Ubuntu 22.04 LTS or newer (GLIBC 2.35+) |
+| **Solana CLI** | Installed and in PATH (`solana-keygen` must work) |
+| **XNT balance** | ≥1 XNT on oracle keypair |
+| **Self-stake** | ≥100 XNT verified on your validator |
+| **Skip rate** | <10% (checked at registration) |
+| **Network** | Port 123/UDP open outbound (NTP) |
+| **Validator status** | Active on mainnet |
+
+> **Check port 123 UDP:**
+> ```bash
+> nc -zu pool.ntp.org 123 && echo "OK — port open" || echo "BLOCKED — open with: sudo ufw allow out 123/udp"
+> ```
+
+> **Other Linux distributions:** Compile from source:
+> ```bash
+> git clone https://github.com/PioWin-clo/strontium
+> cd strontium/daemon && cargo build --release
+> ```
 
 ---
 
@@ -72,12 +108,13 @@ Validator Server                    X1 Blockchain
 ```bash
 wget https://github.com/PioWin-clo/strontium/releases/latest/download/strontium
 chmod +x strontium
-./strontium --help
+./strontium help
 ```
 
 ### Step 2 — Generate oracle keypair
 
-> ⚠️ **Important:** This is a NEW dedicated keypair — do NOT use your `identity.json` or `vote.json`.
+> ⚠️ **NEW dedicated keypair only.** Do NOT use `identity.json` or `vote.json`.
+> If compromised, only the oracle keypair balance is at risk — your validator stays safe.
 
 ```bash
 mkdir -p ~/.config/strontium
@@ -87,28 +124,20 @@ solana-keygen new \
 chmod 600 ~/.config/strontium/oracle-keypair.json
 ```
 
-Note the pubkey shown — you'll need to fund it in the next step.
-
 ### Step 3 — Fund oracle keypair
 
-The oracle keypair pays for registration and ongoing submissions (~0.216 XNT/month). Send at least **1 XNT**:
+Send at least **1 XNT** from any wallet — source doesn't matter:
 
 ```bash
-# Check the oracle keypair address
 solana-keygen pubkey ~/.config/strontium/oracle-keypair.json
-
-# Send 1 XNT from your main wallet (replace SOURCE_KEYPAIR with your wallet)
-solana transfer \
-  <ORACLE_PUBKEY> \
-  1 \
-  --url https://rpc.mainnet.x1.xyz \
-  --keypair <SOURCE_KEYPAIR> \
-  --allow-unfunded-recipient
+# Then send XNT to that address via XDEX, Backpack, CLI, or Ledger
 ```
+
+See the cost table below to choose the right amount for your interval.
 
 ### Step 4 — Register
 
-> ⚠️ **Important:** `vote.json` is your validator's vote keypair — it lives on your server at `~/.config/solana/vote.json`. This is NOT the Ledger withdraw key.
+> ⚠️ `vote.json` is your validator's vote keypair — lives on the server at `~/.config/solana/vote.json`. NOT your Ledger withdraw key.
 
 ```bash
 ./strontium register \
@@ -116,81 +145,149 @@ solana transfer \
   --vote-keypair ~/.config/solana/vote.json
 ```
 
-Expected output:
-```
-✓ Registration successful!
-  TX: <signature>
-  Explorer: https://explorer.mainnet.x1.xyz/tx/<signature>
-```
+Registration validates: validator active, skip rate <10%, self-stake ≥100 XNT.
 
-### Step 5 — Run daemon
+> Registration expires after **90 days** — re-register before expiry.
 
-**Test mode (no transactions sent):**
+### Step 5 — Start daemon
+
+**Dry-run** (NTP consensus only, no on-chain transactions, zero cost):
 ```bash
-./strontium --keypair ~/.config/strontium/oracle-keypair.json --dry-run
+./strontium start --keypair ~/.config/strontium/oracle-keypair.json --dry-run
 ```
 
-**Live mode (background):**
+**Live mode** (submits every 5 minutes):
 ```bash
-nohup ./strontium \
+nohup ./strontium start \
   --keypair ~/.config/strontium/oracle-keypair.json \
   > ~/strontium.log 2>&1 &
 echo "Strontium PID: $!"
 ```
 
-**Check it's working:**
 ```bash
+./strontium status
 tail -f ~/strontium.log
+# You should see: ✅ submit OK — tx: ...
 ```
 
-You should see `✅ submit OK — tx: ...` every 60 seconds.
+### Step 6 — Install as system service
 
----
-
-## Troubleshooting
-
-### `GLIBC_2.39 not found`
-Your system is too old. Strontium requires Ubuntu 22.04+ (GLIBC 2.35+). Ubuntu 20.04 is not supported.
-
-### `AccountNotFound` during registration
-Oracle keypair has no XNT. See Step 3 — fund the keypair first.
-
-### `AccountNotSigner` during registration
-Make sure you're using the correct `--vote-keypair` path. On most validators this is `~/.config/solana/vote.json`.
-
-### `Transaction signature verification failure`
-The oracle keypair file may be corrupted. Generate a new one (Step 2) and fund it again.
-
-### Daemon silent for many cycles
 ```bash
-tail -20 ~/strontium.log
+./strontium install
 ```
-If spread or confidence is low, the daemon is correctly staying silent (Byzantine fault protection). Check your server's NTP connectivity: `ntpdate -q pool.ntp.org`
+
+Automatically detects username and binary path, checks balance, generates and enables `/etc/systemd/system/strontium.service`.
 
 ---
 
-## NTP Sources
+## CLI Reference
 
-| Source | Type | Stratum | Location |
+```
+strontium start            Start daemon (live mode)
+strontium start --dry-run  Start in test mode (no transactions)
+strontium stop             Stop daemon
+strontium status           Status, NTP consensus, balance, rotation
+strontium sources          NTP sources table (RTT, offset, tier, NTS)
+strontium history [N]      Last N on-chain submissions (default: 10)
+strontium register         Register validator oracle
+strontium deregister       Deregister (coming soon)
+strontium balance          Oracle keypair balance and runway
+strontium archive          Export on-chain history to JSONL
+strontium config show      Show current configuration
+strontium config set K V   Set a configuration value
+strontium install          Install as systemd service
+strontium uninstall        Remove systemd service
+```
+
+**Configuration keys** (`strontium config set <key> <value>`):
+
+| Key | Default | Description |
+|---|---|---|
+| `interval` | `300` | Submit interval in seconds |
+| `keypair` | `~/.config/strontium/oracle-keypair.json` | Oracle keypair path |
+| `vote_keypair` | auto-detect | Vote keypair path |
+| `rpc` | localhost + mainnet | Add RPC endpoint |
+| `committee` | *(empty = solo)* | Add oracle pubkey to rotation list |
+| `committee_clear` | — | Clear committee list |
+| `dry_run` | `false` | Test mode (true/false) |
+
+---
+
+## Rotation — Sharing the Cost
+
+Multiple validators can coordinate submissions to share costs and improve coverage. The daemon uses deterministic round-robin rotation — **no communication between servers needed**:
+
+```
+window_id = current_time / interval_s
+primary   = window_id % committee_size
+```
+
+Every daemon independently calculates whose turn it is. A faster server or better connection gives no advantage — the result is the same for everyone.
+
+**Staged fallback** (prevents gaps if primary is offline):
+- `t + 0s` → primary submits
+- `t + 20s` → backup-1 submits if primary was silent
+- `t + 40s` → backup-2 submits if still silent
+
+**How to configure rotation:**
+
+```bash
+# Add both oracle pubkeys to the committee (same on both servers)
+strontium config set committee <PRIME_ORACLE_PUBKEY>
+strontium config set committee <SENTINEL_ORACLE_PUBKEY>
+
+# Verify
+strontium config show
+```
+
+The list is automatically sorted — the order you add them doesn't matter. Restart the daemon after changes.
+
+---
+
+## Cost and Accuracy
+
+Each transaction costs **0.002 XNT**. More operators = lower cost per operator = shorter interval possible = better time accuracy on-chain:
+
+| Operators | Interval | TX/day/operator | XNT/month/operator | On-chain accuracy |
+|---|---|---|---|---|
+| 1 | 300s | 288 | ~17.3 XNT | ±3–10 ms |
+| 2 | 300s | 144 | ~8.6 XNT | ±2–6 ms |
+| 5 | 300s | 58 | ~3.5 XNT | ±2–6 ms |
+| 10 | 120s | 72 | ~4.3 XNT | ±2–5 ms |
+| 50 | 60s | 29 | ~1.7 XNT | ±1–4 ms |
+| 100+ | 30s | 25 | ~1.5 XNT | ±1–4 ms |
+| any + GPS/PPS | any | — | — | ±50 nanoseconds |
+
+> The more operators join, the shorter the interval everyone can afford — improving accuracy for the whole network at the same individual cost.
+
+Change interval:
+```bash
+strontium config set interval 600    # every 10 minutes
+strontium config set interval 3600   # every hour
+```
+
+---
+
+## NTP Sources (17 total)
+
+| Tier | Source | Type | Location |
 |---|---|---|---|
-| PTB Germany | Government atomic | 1 | Brunswick, DE |
-| GUM Poland | Government atomic | 1 | Warsaw, PL |
-| SYRTE France | Government atomic | 1 | Paris, FR |
-| METAS Switzerland | Government atomic | 1 | Bern, CH |
-| Netnod Sweden | Government atomic | 1 | Stockholm, SE |
-| SIDN Netherlands | Government | 1 | Arnhem, NL |
-| NIST USA | Government atomic | 1 | Boulder, CO |
-| USNO USA | Government atomic | 1 | Washington, DC |
-| NICT Japan | Government atomic | 1 | Tokyo, JP |
-| CAS China | Government atomic | 1 | Beijing, CN |
-| NTP Pool (global) | Open-source community | 2-3 | Global |
-| NTP Pool (Europe) | Open-source community | 2-3 | Europe |
-| NTP Pool (Americas) | Open-source community | 2-3 | Americas |
-| NTP Pool (Asia) | Open-source community | 2-3 | Asia |
-| Cloudflare | Commercial | 3 | Global |
-| Google | Commercial | 3 | Global |
+| **T-0 GPS** | `/dev/pps0` | GPS/PPS hardware | Local server |
+| **T-1 NTS** | `ptbtime1.ptb.de` | Atomic + NTS auth | Germany |
+| **T-1 NTS** | `time.cloudflare.com` | Commercial + NTS auth | Global |
+| **T-1 NTS** | `nts.netnod.se` | Atomic + NTS auth | Sweden |
+| **T-2 S1** | `ptbtime2/3.ptb.de` | Government atomic | Germany |
+| **T-2 S1** | `tempus1/2/3.gum.gov.pl` | Government atomic | Poland |
+| **T-2 S1** | `nist1-atl`, `time.nist.gov` | Government atomic | USA |
+| **T-2 S1** | `syrte.obspm.fr`, `ntp.metas.ch` | Government atomic | France, Switzerland |
+| **T-2 S1** | `ntp.jst.mfeed.ad.jp` | Government atomic | Japan |
+| **T-2 S1** | `time.google.com` | Commercial | Global |
+| **T-3 Pool** | `{0,1}.pool.ntp.org` | Community | Global |
+| **T-3 Pool** | `europe.pool.ntp.org` | Community | Europe |
 
-The daemon selects the 5 lowest-latency servers from at least 2 continents. Stratum 1 (government atomic) sources are preferred.
+All sources queried in parallel. List refreshed every hour. GPS/PPS auto-detected via `/dev/pps0`.
+
+> **NTS note:** T-1 NTS servers are already in use. The roadmap item refers to full NTS protocol client-side implementation (cryptographic handshake), which requires a separate library.
 
 ---
 
@@ -206,138 +303,97 @@ The daemon selects the 5 lowest-latency servers from at least 2 continents. Stra
 
 ## Reading Time On-Chain
 
-```rust
-// In your Anchor program:
-use anchor_lang::prelude::*;
+Every submission is visible in the explorer. Each transaction contains a Memo:
+```
+strontium:v1:w=1234:t=1712780400000:c=87:s=5
+```
+where: `w` = window id, `t` = Unix time in ms, `c` = confidence (0–100), `s` = sources used.
 
-#[derive(Accounts)]
-pub struct YourInstruction<'info> {
-    #[account(
-        address = "EtjkQqf1h9gtwHpi2QPRTefWg3XmDfmjQ6YozYZspJzn".parse().unwrap()
-    )]
-    pub oracle: AccountInfo<'info>,
-}
+All submissions: [X1 Explorer — Oracle PDA](https://explorer.mainnet.x1.xyz/address/EtjkQqf1h9gtwHpi2QPRTefWg3XmDfmjQ6YozYZspJzn)
 
-// Get trusted UTC timestamp (milliseconds):
-let trusted_time_ms = strontium::cpi::read_time(
-    CpiContext::new(strontium_program, accounts),
-    max_staleness_slots
-)?;
+For on-chain integration via Anchor, read the `OracleState` account at the Oracle PDA address and use `latest_trusted_time_ms`. Check `staleness_slots` against your maximum acceptable staleness before trusting the value.
+
+---
+
+## Troubleshooting
+
+**Daemon silent for many cycles:**
+```bash
+strontium status    # check silent_reason field
+strontium sources   # check which NTP servers respond
 ```
 
----
-
-## Accuracy
-
-| Active validators | Accuracy |
+| Silent reason | What to do |
 |---|---|
-| 1 | ±3-10ms |
-| 5 | ±2-6ms |
-| 10 | ±2-5ms |
-| 50+ | ±1-4ms |
+| `no_valid_sources` | Check port 123/UDP: `nc -zu pool.ntp.org 123` |
+| `spread_too_high` | NTP sources disagree by >50ms — wait |
+| `low_confidence` | Not enough quality sources — check `strontium sources` |
+| `not_elected` | Rotation: another validator's window — normal |
+| `registration_expired` | Run `strontium register` again (TTL 90 days) |
+| `insufficient_balance` | Fund oracle keypair |
+| `dry_run` | Test mode active — restart without `--dry-run` |
 
-Physical limit: NTP network latency (~1-5ms). Future improvement: GPS/PPS modules → ±50 nanoseconds.
+**Registration errors:**
 
----
-
-## Operating Costs
-
-| Per validator | Cost |
+| Error | Solution |
 |---|---|
-| Daily | ~0.0072 XNT |
-| Monthly | ~0.216 XNT (~$0.09 at current prices) |
+| `AccountNotFound` | Fund oracle keypair (Step 3) |
+| `AccountNotSigner` | Check `--vote-keypair` path |
+| `Insufficient self-stake` | Increase self-stake to ≥100 XNT via XDEX Valistake |
+| `Skip rate too high` | Wait for validator skip rate to drop below 10% |
 
-Cost scales with XNT price. At $1/XNT → ~$0.22/month. At $10/XNT → ~$2.16/month.
+**Binary won't run (`GLIBC not found`):**
+```bash
+git clone https://github.com/PioWin-clo/strontium
+cd strontium/daemon && cargo build --release
+./target/release/strontium help
+```
 
 ---
 
 ## Security
 
-**Upgrade authority:** Currently held by the project author (`EgFaM42nFeZYwDXzMZWNTmp5ojyL7UGP8xgdX1SBXYsb`). Transfer to community multisig is planned as the network of submitters grows.
+**Upgrade authority:** `EgFaM42nFeZYwDXzMZWNTmp5ojyL7UGP8xgdX1SBXYsb`
 
-**Threat model:**
-- Single validator lying → eliminated by median (requires >50% to move it)
-- NTP MITM attack → cross-continental check detects divergence
-- Spam submissions → ValidatorRegistration required (vote account proof)
-- Keypair compromise → deregister + re-register; only ~0.22 XNT at risk
+| Attack | Mitigation |
+|---|---|
+| Single validator lying | Stake-weighted median — requires majority of submitters |
+| NTP MITM | Multi-continental cross-check (50ms threshold) |
+| Submission spam | ValidatorRegistration required (vote proof + stake) |
+| Oracle key compromise | Only oracle keypair exposed — identity/vote untouched |
+| GPS spoofing | Cross-checked against NTP consensus (±5s threshold) |
 
-**Responsible disclosure:** Open a [GitHub issue](https://github.com/PioWin-clo/strontium/issues) or contact via X1 Validators Telegram.
+**Responsible disclosure:** [GitHub Issues](https://github.com/PioWin-clo/strontium/issues) or X1 Validator Army Telegram.
 
 ---
 
 ## Roadmap
 
-- [x] Core NTP consensus daemon
-- [x] On-chain median aggregation (zero_copy, ring buffer)
-- [x] ValidatorRegistration (vote account proof)
-- [ ] Stake threshold enforcement (MIN_STAKE > 0)
-- [ ] Registration TTL (auto-expire inactive submitters)
-- [ ] GPS/PPS support for sub-millisecond accuracy
-- [ ] Roughtime support (cryptographic time authentication)
-- [ ] Alpenglow integration (time attestation layer)
-- [ ] Community multisig upgrade authority
+- [x] Parallel NTP querying with 4-tier source classification
+- [x] On-chain ring buffer (288 slots, `zero_copy`)
+- [x] ValidatorRegistration — vote account proof + stake check + TTL 90d
+- [x] `sources_bitmap` per submission — full auditability
+- [x] Confidence scoring
+- [x] Full CLI (`start`, `stop`, `status`, `sources`, `config`, `install`, ...)
+- [x] Automatic systemd installer
+- [x] Memo Program in every transaction — full transparency
+- [x] Circuit breaker RPC with exponential backoff
+- [x] Deterministic round-robin rotation (`slot % n`) — cost sharing
+- [x] `ed25519-dalek` v2, clean Clippy, security audit
+- [ ] Dashboard — consensus visualization, history, validator health
+- [ ] On-chain stake threshold enforcement
+- [ ] Full NTS client-side protocol
+- [ ] GPS/PPS production-tested path
+- [ ] Alpenglow integration (τₖ phase-lock — the missing time layer for eigenvm)
 
 ---
 
 ## Built on X1
 
-X1 Strontium is open-source infrastructure for the X1 ecosystem. It uses [Anchor](https://anchor-lang.com) 0.31.1 on [Tachyon](https://x1.xyz) 2.2.20.
+X1 Strontium is open-source infrastructure for the X1 ecosystem.
+Built with Anchor 0.31.1 on Tachyon 2.2.20. CI: Build + Clippy + Security audit on every commit.
 
-*"Strontium" — named after the element used in the world's most accurate optical atomic clocks, more precise than caesium-based UTC.*
+**Standing on open shoulders:** X1 Strontium was conceived independently, but could not exist without Jack Levin's vision and the work of the entire X1 team — Photon Oracle, Entropy Engine, and the X1 blockchain itself. Jack and his team built the foundation. We built on it.
 
----
-
-## Auto-start on Boot (systemd)
-
-To run Strontium automatically when the server starts:
-
-**Step 1 — Create service file:**
-
-```bash
-sudo nano /etc/systemd/system/strontium.service
-```
-
-Paste this content (replace `x1pio` with your username if different):
-
-```ini
-[Unit]
-Description=X1 Strontium Time Oracle Daemon
-After=network.target
-Wants=network-online.target
-
-[Service]
-Type=simple
-User=x1pio
-ExecStart=/home/x1pio/strontium --keypair /home/x1pio/.config/strontium/oracle-keypair.json
-Restart=on-failure
-RestartSec=10
-StandardOutput=append:/home/x1pio/strontium.log
-StandardError=append:/home/x1pio/strontium.log
-
-[Install]
-WantedBy=multi-user.target
-```
-
-**Step 2 — Enable and start:**
-
-```bash
-sudo systemctl daemon-reload
-sudo systemctl enable strontium
-sudo systemctl start strontium
-```
-
-**Step 3 — Check status:**
-
-```bash
-sudo systemctl status strontium
-tail -f ~/strontium.log
-```
-
-**Useful commands:**
-
-```bash
-sudo systemctl stop strontium      # stop daemon
-sudo systemctl restart strontium   # restart daemon
-sudo systemctl disable strontium   # remove from autostart
-journalctl -u strontium -f         # view systemd logs
-```
+**Concept & architecture:** PioWin
+**Code:** Claude (Anthropic) with support from Theo (Cyberdyne)
