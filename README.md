@@ -108,7 +108,7 @@ Every submission is visible in the explorer and fully auditable.
 ```bash
 wget https://github.com/PioWin-clo/strontium/releases/latest/download/strontium
 chmod +x strontium
-./strontium help
+x1sr help
 ```
 
 ### Step 2 — Generate oracle keypair
@@ -140,7 +140,7 @@ See the cost table below to choose the right amount for your interval.
 > ⚠️ `vote.json` is your validator's vote keypair — lives on the server at `~/.config/solana/vote.json`. NOT your Ledger withdraw key.
 
 ```bash
-./strontium register \
+x1sr register \
   --keypair ~/.config/strontium/oracle-keypair.json \
   --vote-keypair ~/.config/solana/vote.json
 ```
@@ -153,19 +153,19 @@ Registration validates: validator active, skip rate <10%, self-stake ≥100 XNT.
 
 **Dry-run** (NTP consensus only, no on-chain transactions, zero cost):
 ```bash
-./strontium start --keypair ~/.config/strontium/oracle-keypair.json --dry-run
+x1sr start --keypair ~/.config/strontium/oracle-keypair.json --dry-run
 ```
 
 **Live mode** (submits every 5 minutes):
 ```bash
-nohup ./strontium start \
+nohup x1sr start \
   --keypair ~/.config/strontium/oracle-keypair.json \
   > ~/strontium.log 2>&1 &
 echo "Strontium PID: $!"
 ```
 
 ```bash
-./strontium status
+x1sr status
 tail -f ~/strontium.log
 # You should see: ✅ submit OK — tx: ...
 ```
@@ -173,7 +173,7 @@ tail -f ~/strontium.log
 ### Step 6 — Install as system service
 
 ```bash
-./strontium install
+x1sr install
 ```
 
 Automatically detects username and binary path, checks balance, generates and enables `/etc/systemd/system/strontium.service`.
@@ -183,23 +183,23 @@ Automatically detects username and binary path, checks balance, generates and en
 ## CLI Reference
 
 ```
-strontium start            Start daemon (live mode)
-strontium start --dry-run  Start in test mode (no transactions)
-strontium stop             Stop daemon
-strontium status           Status, NTP consensus, balance, rotation
-strontium sources          NTP sources table (RTT, offset, tier, NTS)
-strontium history [N]      Last N on-chain submissions (default: 10)
-strontium register         Register validator oracle
-strontium deregister       Deregister (coming soon)
-strontium balance          Oracle keypair balance and runway
-strontium archive          Export on-chain history to JSONL
-strontium config show      Show current configuration
-strontium config set K V   Set a configuration value
-strontium install          Install as systemd service
-strontium uninstall        Remove systemd service
+x1sr start            Start daemon (live mode)
+x1sr start --dry-run  Start in test mode (no transactions)
+x1sr stop             Stop daemon
+x1sr status           Status, NTP consensus, balance, rotation
+x1sr sources          NTP sources table (RTT, offset, tier, NTS)
+x1sr history [N]      Last N on-chain submissions (default: 10)
+x1sr register         Register validator oracle
+x1sr deregister       Deregister (coming soon)
+x1sr balance          Oracle keypair balance and runway
+x1sr archive          Export on-chain history to JSONL
+x1sr config show      Show current configuration
+x1sr config set K V   Set a configuration value
+x1sr install          Install as systemd service
+x1sr uninstall        Remove systemd service
 ```
 
-**Configuration keys** (`strontium config set <key> <value>`):
+**Configuration keys** (`x1sr config set <key> <value>`):
 
 | Key | Default | Description |
 |---|---|---|
@@ -233,11 +233,11 @@ Every daemon independently calculates whose turn it is. A faster server or bette
 
 ```bash
 # Add both oracle pubkeys to the committee (same on both servers)
-strontium config set committee <PRIME_ORACLE_PUBKEY>
-strontium config set committee <SENTINEL_ORACLE_PUBKEY>
+x1sr config set committee <PRIME_ORACLE_PUBKEY>
+x1sr config set committee <SENTINEL_ORACLE_PUBKEY>
 
 # Verify
-strontium config show
+x1sr config show
 ```
 
 The list is automatically sorted — the order you add them doesn't matter. Restart the daemon after changes.
@@ -262,8 +262,8 @@ Each transaction costs **0.002 XNT**. More operators = lower cost per operator =
 
 Change interval:
 ```bash
-strontium config set interval 600    # every 10 minutes
-strontium config set interval 3600   # every hour
+x1sr config set interval 600    # every 10 minutes
+x1sr config set interval 3600   # every hour
 ```
 
 ---
@@ -319,17 +319,17 @@ For on-chain integration via Anchor, read the `OracleState` account at the Oracl
 
 **Daemon silent for many cycles:**
 ```bash
-strontium status    # check silent_reason field
-strontium sources   # check which NTP servers respond
+x1sr status    # check silent_reason field
+x1sr sources   # check which NTP servers respond
 ```
 
 | Silent reason | What to do |
 |---|---|
 | `no_valid_sources` | Check port 123/UDP: `nc -zu pool.ntp.org 123` |
 | `spread_too_high` | NTP sources disagree by >50ms — wait |
-| `low_confidence` | Not enough quality sources — check `strontium sources` |
+| `low_confidence` | Not enough quality sources — check `x1sr sources` |
 | `not_elected` | Rotation: another validator's window — normal |
-| `registration_expired` | Run `strontium register` again (TTL 90 days) |
+| `registration_expired` | Run `x1sr register` again (TTL 90 days) |
 | `insufficient_balance` | Fund oracle keypair |
 | `dry_run` | Test mode active — restart without `--dry-run` |
 
@@ -346,7 +346,7 @@ strontium sources   # check which NTP servers respond
 ```bash
 git clone https://github.com/PioWin-clo/strontium
 cd strontium/daemon && cargo build --release
-./target/release/strontium help
+target/release/strontium help
 ```
 
 ---
