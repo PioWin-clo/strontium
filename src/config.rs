@@ -35,6 +35,15 @@ pub struct StrontiumConfig {
     /// Dry run mode — NTP consensus without submitting TX
     pub dry_run: bool,
 
+    /// Cross-tier consensus threshold in ms (default: 60)
+    /// At least one T-1 or T-2 source must agree with median within this window
+    /// Based on real RTT measurements from X1 validator network
+    pub tier_consensus_threshold_ms: i64,
+
+    /// Include Memo Program instruction in each TX (default: true)
+    /// Set to false for lower compute units in production
+    pub memo_enabled: bool,
+
     /// Committee: sorted list of oracle pubkeys for rotation
     /// Empty = solo mode (always my turn)
     pub committee: Vec<String>,
@@ -57,6 +66,8 @@ impl Default for StrontiumConfig {
             alert_balance_threshold: 1.0,
             dry_run: false,
             committee: vec![],
+            memo_enabled: true,
+            tier_consensus_threshold_ms: 60,
         }
     }
 }
@@ -125,6 +136,13 @@ impl StrontiumConfig {
             "committee_clear" => {
                 self.committee.clear();
             }
+            "tier_threshold" | "tier_consensus_threshold_ms" => {
+                self.tier_consensus_threshold_ms = value.parse::<i64>()
+                    .map_err(|_| "tier_threshold must be a number in ms".to_string())?;
+            }
+            "memo" | "memo_enabled" => {
+                self.memo_enabled = value == "true" || value == "1";
+            }
             _ => return Err(format!("Unknown config key: {}", key)),
         }
         Ok(())
@@ -146,6 +164,8 @@ impl StrontiumConfig {
         println!("  alert_webhook  : {}", self.alert_webhook.as_deref().unwrap_or("not set"));
         println!("  alert_balance  : {} XNT", self.alert_balance_threshold);
         println!("  dry_run        : {}", self.dry_run);
+        println!("  memo_enabled   : {}", self.memo_enabled);
+        println!("  tier_threshold : {}ms (cross-tier consensus)", self.tier_consensus_threshold_ms);
         if !self.committee.is_empty() {
             println!("  committee      : {} oracles", self.committee.len());
             for (i, p) in self.committee.iter().enumerate() {

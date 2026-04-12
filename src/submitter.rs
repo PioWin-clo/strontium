@@ -48,6 +48,50 @@ impl CircuitBreaker {
     }
 }
 
+
+
+
+/// Get current chain time from RPC via getSlot + getBlockTime
+/// Returns milliseconds since Unix epoch, or None on error
+pub fn get_chain_time_ms(rpc: &mut RpcClient) -> Option<i64> {
+    let url = rpc.active_url()?.to_string();
+
+    // Step 1: get current slot
+    let slot_resp = ureq::post(&url)
+        .set("Content-Type", "application/json")
+        .set("User-Agent", "X1-Strontium/1.0")
+        .timeout(std::time::Duration::from_secs(5))
+        .send_string(r#"{"jsonrpc":"2.0","id":1,"method":"getSlot","params":[]}"#)
+        .ok()?.into_string().ok()?;
+
+    // Parse slot number
+    let prefix = "\"result\":";
+    let start = slot_resp.find(prefix)? + prefix.len();
+    let rest = slot_resp[start..].trim_start();
+    let end = rest.find(|c: char| !c.is_ascii_digit()).unwrap_or(rest.len());
+    let slot: u64 = rest[..end].parse().ok()?;
+
+    // Step 2: get block time for that slot
+    let payload = format!(
+        r#"{{"jsonrpc":"2.0","id":1,"method":"getBlockTime","params":[{}]}}"#,
+        slot
+    );
+    let time_resp = ureq::post(&url)
+        .set("Content-Type", "application/json")
+        .set("User-Agent", "X1-Strontium/1.0")
+        .timeout(std::time::Duration::from_secs(5))
+        .send_string(&payload)
+        .ok()?.into_string().ok()?;
+
+    // Parse unix timestamp
+    let start2 = time_resp.find(prefix)? + prefix.len();
+    let rest2 = time_resp[start2..].trim_start();
+    let end2 = rest2.find(|c: char| !c.is_ascii_digit()).unwrap_or(rest2.len());
+    let unix_ts: i64 = rest2[..end2].parse().ok()?;
+
+    Some(unix_ts * 1000)
+}
+
 // ─── RPC Client ───────────────────────────────────────────────────────────────
 
 pub struct RpcClient {
@@ -200,6 +244,7 @@ pub fn build_submit_transaction(
     blockhash:     &[u8; 32],
     consensus:     &ConsensusResult,
     window_id:     u64,
+    memo_enabled:  bool,
 ) -> Vec<u8> {
     let oracle_pubkey: [u8; 32] = keypair.verifying_key().to_bytes();
 
@@ -222,16 +267,27 @@ pub fn build_submit_transaction(
     );
     let memo_data = memo_str.as_bytes().to_vec();
 
-    // Build message with 2 instructions: submit_time + memo
-    let msg = build_message_two_instructions(
-        &oracle_pubkey,
-        program_id,
-        oracle_pda,
-        reg_pda,
-        blockhash,
-        &ix_data,
-        &memo_data,
-    );
+    // Build message — with or without Memo instruction
+    let msg = if memo_enabled {
+        build_message_two_instructions(
+            &oracle_pubkey,
+            program_id,
+            oracle_pda,
+            reg_pda,
+            blockhash,
+            &ix_data,
+            &memo_data,
+        )
+    } else {
+        build_message_one_instruction(
+            &oracle_pubkey,
+            program_id,
+            oracle_pda,
+            reg_pda,
+            blockhash,
+            &ix_data,
+        )
+    };
 
     // Sign
     let signature = keypair.sign(&msg);
@@ -242,6 +298,41 @@ pub fn build_submit_transaction(
     tx.extend_from_slice(&sig_bytes);
     tx.extend_from_slice(&msg);
     tx
+}
+
+
+/// Build Solana message with submit_time only (no memo) — lower compute units
+fn build_message_one_instruction(
+    oracle:       &[u8; 32],
+    program_id:   &[u8; 32],
+    oracle_pda:   &[u8; 32],
+    reg_pda:      &[u8; 32],
+    blockhash:    &[u8; 32],
+    ix_data:      &[u8],
+) -> Vec<u8> {
+    let mut msg = Vec::new();
+
+    // Header: [num_signers=1, num_readonly_signed=0, num_readonly_unsigned=2]
+    msg.extend_from_slice(&[1u8, 0u8, 2u8]);
+
+    // Account list (4): oracle, oracle_pda, reg_pda, program_id
+    encode_compact_u16(&mut msg, 4);
+    msg.extend_from_slice(oracle);
+    msg.extend_from_slice(oracle_pda);
+    msg.extend_from_slice(reg_pda);
+    msg.extend_from_slice(program_id);
+
+    msg.extend_from_slice(blockhash);
+
+    // 1 instruction: submit_time
+    encode_compact_u16(&mut msg, 1);
+    msg.push(3u8); // program_id index
+    encode_compact_u16(&mut msg, 3); // 3 accounts
+    msg.extend_from_slice(&[0u8, 1u8, 2u8]);
+    encode_compact_u16(&mut msg, ix_data.len() as u16);
+    msg.extend_from_slice(ix_data);
+
+    msg
 }
 
 /// Build Solana message with submit_time + memo instructions
@@ -429,7 +520,7 @@ pub fn parse_blockhash(resp: &str) -> Result<[u8; 32], String> {
     let prefix = "\"blockhash\":\"";
     let start  = resp.find(prefix).ok_or("No blockhash in response")?;
     let rest   = &resp[start + prefix.len()..];
-    let end    = rest.find('"').ok_or("Unterminated blockhash")?;
+    let end    = rest.find('\"').ok_or("Unterminated blockhash")?;
     let bh_str = &rest[..end];
     let bytes  = bs58::decode(bh_str).into_vec()
         .map_err(|e| format!("Blockhash decode: {}", e))?;
@@ -450,7 +541,7 @@ fn parse_signature(resp: &str) -> Result<String, String> {
         let msg = resp.find("\"message\":\"")
             .map(|i| {
                 let s = &resp[i + 11..];
-                let e = s.find('"').unwrap_or(s.len());
+                let e = s.find('\"').unwrap_or(s.len());
                 s[..e].to_string()
             })
             .unwrap_or_else(|| resp.to_string());
@@ -459,7 +550,7 @@ fn parse_signature(resp: &str) -> Result<String, String> {
     let prefix = "\"result\":\"";
     let start  = resp.find(prefix).ok_or("No result in response")?;
     let rest   = &resp[start + prefix.len()..];
-    let end    = rest.find('"').ok_or("Unterminated signature")?;
+    let end    = rest.find('\"').ok_or("Unterminated signature")?;
     Ok(rest[..end].to_string())
 }
 

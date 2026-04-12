@@ -26,6 +26,10 @@ pub struct DaemonStatus {
     pub rotation_next_turn_secs: Option<u64>,
     pub oracle_pubkey:     Option<String>,
     pub last_error:        Option<String>,
+    pub submissions_total:    u64,      // wszystkie udane submisje
+    pub expected_turns_24h:   u64,      // ile razy powinienem był submitować (24h)
+    pub successful_turns_24h: u64,      // ile razy faktycznie submitowałem w swoim oknie
+    pub liveness_warning:     bool,     // true gdy activity ratio < 70%
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -41,6 +45,8 @@ pub enum SilentReason {
     SpreadTooHigh,
     ValidatorNotActive,
     RegistrationExpired,
+    TimestampOutlier,
+    LeapSecondDetected,
 }
 
 impl std::fmt::Display for SilentReason {
@@ -56,6 +62,8 @@ impl std::fmt::Display for SilentReason {
             SilentReason::SpreadTooHigh       => write!(f, "NTP spread too high"),
             SilentReason::ValidatorNotActive  => write!(f, "validator not active"),
             SilentReason::RegistrationExpired => write!(f, "registration expired"),
+            SilentReason::TimestampOutlier    => write!(f, "timestamp outlier (>10s from chain clock)"),
+            SilentReason::LeapSecondDetected  => write!(f, "leap second detected — sources diverge >400ms"),
         }
     }
 }

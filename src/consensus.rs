@@ -34,7 +34,7 @@ pub fn build_sources_bitmap(results: &[NtpResult]) -> u8 {
 
 /// Compute NTP consensus from parallel results
 /// Returns None if consensus cannot be reached (spread too high, too few sources)
-pub fn compute_consensus(results: &[NtpResult]) -> Option<ConsensusResult> {
+pub fn compute_consensus(results: &[NtpResult], tier_threshold_ms: i64) -> Option<ConsensusResult> {
     if results.len() < MIN_SOURCES { return None; }
 
     // Sort timestamps
@@ -54,6 +54,18 @@ pub fn compute_consensus(results: &[NtpResult]) -> Option<ConsensusResult> {
 
     // Spread (max - min)
     let spread_ms = timestamps[n-1] - timestamps[0];
+
+    // Leap second detection: if spread is between 400ms and 1100ms
+    // this is likely a leap second event (smearing vs stepping servers)
+    // Log warning but still return None — silence is correct behavior
+    if spread_ms >= 400 && spread_ms <= 1100 {
+        eprintln!(
+            "[warn] ⚠ LEAP SECOND? Sources diverge {}ms — possible leap second event.              Staying silent. Check https://www.ietf.org/timezones/data/leap-seconds.list",
+            spread_ms
+        );
+        return None;
+    }
+
     if spread_ms > MAX_SPREAD_MS { return None; }
 
     // Sanity check against system clock (NOT a vote, just a check)
@@ -88,6 +100,18 @@ pub fn compute_consensus(results: &[NtpResult]) -> Option<ConsensusResult> {
 
     if confidence < MIN_CONFIDENCE { return None; }
 
+    // Cross-tier validation: at least one T-1 or T-2 must agree with median
+    // Prevents Pool-only manipulation (Theo's security recommendation)
+    let has_quality_source = results.iter().any(|r| {
+        matches!(r.tier, NtpTier::Gps | NtpTier::Nts | NtpTier::Stratum1)
+        && (r.timestamp_ms - median_ms).abs() <= tier_threshold_ms
+    });
+    if !has_quality_source {
+        // Only Pool sources available or all T-1/T-2 disagree with median
+        eprintln!("[warn] No T-1/T-2 source within {}ms of median — staying silent", tier_threshold_ms);
+        return None;
+    }
+
     let sources_bitmap = build_sources_bitmap(results);
     let is_gps         = results.iter().any(|r| matches!(r.tier, NtpTier::Gps));
 
@@ -103,12 +127,12 @@ pub fn compute_consensus(results: &[NtpResult]) -> Option<ConsensusResult> {
 }
 
 /// Full consensus cycle including GPS/PPS if available
-pub fn run_consensus_cycle(ntp_results: &[NtpResult]) -> Option<ConsensusResult> {
+pub fn run_consensus_cycle(ntp_results: &[NtpResult], tier_threshold_ms: i64) -> Option<ConsensusResult> {
     // If GPS/PPS available, use it as primary source with NTP as cross-check
     if has_gps_pps() {
         if let Some(gps_ms) = get_gps_time_ms() {
             // Cross-check GPS against NTP
-            if let Some(ntp_consensus) = compute_consensus(ntp_results) {
+            if let Some(ntp_consensus) = compute_consensus(ntp_results, tier_threshold_ms) {
                 let drift = (gps_ms - ntp_consensus.timestamp_ms).abs();
                 if drift < 5000 {
                     // GPS and NTP agree — use GPS (more accurate)
@@ -130,7 +154,7 @@ pub fn run_consensus_cycle(ntp_results: &[NtpResult]) -> Option<ConsensusResult>
     }
 
     // Standard NTP consensus
-    compute_consensus(ntp_results)
+    compute_consensus(ntp_results, tier_threshold_ms)
 }
 
 /// Determine if it's this operator's turn to submit (window_id rotation)
@@ -166,10 +190,16 @@ pub fn rotation_my_turn(
     let backup1_index = (primary_index + 1) % n_validators;
     let backup2_index = (primary_index + 2) % n_validators;
 
+    // PRIMARY_GRACE_S = czas który dajemy primary na wysłanie TX
+    // (NTP query ~3s + TX build + send ~2s + sieć ~1s = ~6s)
+    // Backup-1 wchodzi po PRIMARY_GRACE_S od startu okna
+    // Backup-2 wchodzi po 2 × PRIMARY_GRACE_S
+    const PRIMARY_GRACE_S: u64 = 30;
+
     let is_my_turn =
         my_index == primary_index
-        || (my_index == backup1_index && window_secs_elapsed >= 20)
-        || (my_index == backup2_index && window_secs_elapsed >= 40);
+        || (my_index == backup1_index && window_secs_elapsed >= PRIMARY_GRACE_S)
+        || (my_index == backup2_index && window_secs_elapsed >= PRIMARY_GRACE_S * 2);
 
     (is_my_turn, window_id, window_secs_remain)
 }

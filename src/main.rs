@@ -10,10 +10,10 @@ use std::time::{Duration, SystemTime, UNIX_EPOCH};
 
 use config::{StrontiumConfig, ORACLE_PDA};
 use status::{DaemonStatus, SilentReason};
-use ntp_client::{discover_sources, query_sources_parallel, has_gps_pps};
-use consensus::{run_consensus_cycle, rotation_my_turn};
+use ntp_client::{discover_sources, query_sources_parallel, has_gps_pps, dedup_sources};
+use consensus::{run_consensus_cycle, rotation_my_turn, window_has_submission};
 use submitter::{RpcClient, build_submit_transaction, derive_registration_pda,
-                lamports_to_xnt, estimate_days_remaining};
+                lamports_to_xnt, estimate_days_remaining, get_chain_time_ms};
 use register::{run_register, load_keypair};
 
 // ─── Constants ────────────────────────────────────────────────────────────────
@@ -75,6 +75,7 @@ fn main() {
 
 // ─── Main Daemon Loop ─────────────────────────────────────────────────────────
 
+
 fn run_daemon(config: StrontiumConfig) {
     println!("╔═══════════════════════════════════════╗");
     println!("║   X1 Strontium — Time Oracle Daemon  ║");
@@ -130,7 +131,7 @@ fn run_daemon(config: StrontiumConfig) {
 
     // Discover NTP sources
     println!("[{}] 🔍 Discovering NTP servers...", now_str());
-    let mut ntp_cache = discover_sources(5);
+    let mut ntp_cache = dedup_sources(discover_sources(10));
     let mut last_rediscover = unix_secs();
     let mut cycle_num = 0u64;
 
@@ -155,7 +156,7 @@ fn run_daemon(config: StrontiumConfig) {
         // Re-discover NTP sources periodically
         if unix_secs() - last_rediscover > REDISCOVER_SECS {
             println!("[{}] 🔍 Re-discovering NTP servers...", now_str());
-            ntp_cache = discover_sources(5);
+            ntp_cache = dedup_sources(discover_sources(10));
             print_ntp_sources(&ntp_cache);
             last_rediscover = unix_secs();
         }
@@ -171,7 +172,7 @@ fn run_daemon(config: StrontiumConfig) {
         }
 
         // Compute consensus
-        let consensus = match run_consensus_cycle(&results) {
+        let consensus = match run_consensus_cycle(&results, config.tier_consensus_threshold_ms) {
             Some(c) => c,
             None => {
                 println!("[{}] ✗ No consensus (spread too high or insufficient sources)", now_str());
@@ -201,6 +202,31 @@ fn run_daemon(config: StrontiumConfig) {
             continue;
         }
 
+        // Liveness tracking — oblicz expected turns per 24h
+        {
+            let turns_per_day = 86400u64 / config.interval_s / if config.committee.is_empty() { 1 } else { config.committee.len() } as u64;
+            let mut st = DaemonStatus::load();
+            st.expected_turns_24h = turns_per_day;
+            // Reset licznika co 24h
+            let now_ms = std::time::SystemTime::now()
+                .duration_since(std::time::UNIX_EPOCH)
+                .unwrap_or_default().as_millis() as i64;
+            let last_ts = st.last_submit_ts.unwrap_or(0);
+            if now_ms - last_ts > 86_400_000 {
+                st.successful_turns_24h = 0;
+            }
+            // Liveness warning gdy < 70% oczekiwanych
+            if st.expected_turns_24h > 0 {
+                let ratio = st.successful_turns_24h as f64 / st.expected_turns_24h as f64;
+                st.liveness_warning = ratio < 0.70;
+                if st.liveness_warning {
+                    eprintln!("[warn] ⚠ Liveness warning: {}/{} turns in 24h ({:.0}% < 70%)",
+                        st.successful_turns_24h, st.expected_turns_24h, ratio * 100.0);
+                }
+            }
+            st.save();
+        }
+
         // Rotation check — is it my turn?
         // committee = sorted list of oracle pubkeys from config
         // Empty committee = solo mode (always my turn)
@@ -208,8 +234,17 @@ fn run_daemon(config: StrontiumConfig) {
         let my_index = if config.committee.is_empty() {
             0usize
         } else {
-            config.committee.iter().position(|p| p == &oracle_pubkey).unwrap_or(0)
+            match config.committee.iter().position(|p| p == &oracle_pubkey) {
+                Some(idx) => idx,
+                None => {
+                    // Oracle pubkey nie ma w committee — działamy w solo mode
+                    eprintln!("[warn] ⚠ Oracle pubkey {} not found in committee — running solo mode", &oracle_pubkey[..8]);
+                    eprintln!("[warn]   Add to committee: x1sr config set committee {}", oracle_pubkey);
+                    0usize
+                }
+            }
         };
+
         let (is_my_turn, window_id, _) = rotation_my_turn(
             &oracle_bytes,
             my_index,
@@ -218,10 +253,33 @@ fn run_daemon(config: StrontiumConfig) {
         );
 
         if !is_my_turn {
-            println!("[{}] ⟳ Not my turn (rotation window {})", now_str(), window_id);
+            // Anti-dublet: sprawdź czy ktoś już submitował w tym oknie
+            let last_ts = {
+                let st = DaemonStatus::load();
+                st.last_submit_ts
+            };
+            if window_has_submission(last_ts, config.interval_s) {
+                // Ktoś już submitował w tym oknie — milczymy
+                println!("[{}] ⟳ Window {} already covered", now_str(), window_id);
+            } else {
+                println!("[{}] ⟳ Not my turn (rotation window {})", now_str(), window_id);
+            }
             update_status_silent(SilentReason::NotElected, balance_xnt, days_left, &config, &oracle_pubkey);
             thread::sleep(Duration::from_secs(config.interval_s));
             continue;
+        }
+
+        // Outlier check — compare NTP consensus with chain clock
+        const OUTLIER_THRESHOLD_MS: i64 = 10_000; // 10 seconds
+        if let Some(chain_ms) = get_chain_time_ms(&mut rpc) {
+            let drift = (consensus.timestamp_ms - chain_ms).abs();
+            if drift > OUTLIER_THRESHOLD_MS {
+                eprintln!("[{}] ✗ Timestamp outlier: NTP {}ms vs chain {}ms (drift={}ms)",
+                    now_str(), consensus.timestamp_ms, chain_ms, drift);
+                update_status_silent(SilentReason::TimestampOutlier, balance_xnt, days_left, &config, &oracle_pubkey);
+                thread::sleep(Duration::from_secs(config.interval_s));
+                continue;
+            }
         }
 
         // Get recent blockhash and send
@@ -241,6 +299,7 @@ fn run_daemon(config: StrontiumConfig) {
                     &blockhash,
                     &consensus,
                     window_id,
+                    config.memo_enabled,
                 );
 
                 let tx_b64 = base64_encode(&tx);

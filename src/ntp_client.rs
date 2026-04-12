@@ -21,7 +21,7 @@ pub const NTP_SOURCES: &[NtpSource] = &[
     // Tier-1: NTS-capable government atomic clocks
     NtpSource { host: "ptbtime1.ptb.de",   port: 123, stratum: 1, tier: NtpTier::Nts,      nts: true,  region: "Europe"    },
     NtpSource { host: "time.cloudflare.com", port: 123, stratum: 3, tier: NtpTier::Nts,    nts: true,  region: "Global"    },
-    NtpSource { host: "nts.netnod.se",      port: 4460, stratum: 1, tier: NtpTier::Nts,    nts: true,  region: "Europe"    },
+    NtpSource { host: "nts.netnod.se",      port: 123,  stratum: 1, tier: NtpTier::Stratum1, nts: false, region: "Europe"    },
 
     // Tier-2: Government atomic stratum 1
     NtpSource { host: "ptbtime2.ptb.de",        port: 123, stratum: 1, tier: NtpTier::Stratum1, nts: false, region: "Europe" },
@@ -36,6 +36,13 @@ pub const NTP_SOURCES: &[NtpSource] = &[
     NtpSource { host: "syrte.obspm.fr",         port: 123, stratum: 1, tier: NtpTier::Stratum1, nts: false, region: "Europe" },
     NtpSource { host: "ntp.metas.ch",           port: 123, stratum: 1, tier: NtpTier::Stratum1, nts: false, region: "Europe" },
     NtpSource { host: "time.google.com",        port: 123, stratum: 1, tier: NtpTier::Stratum1, nts: false, region: "Global" },
+
+    // Dodatkowe T-2 blisko MEVSPACE Warszawa (potwierdzone pingami)
+    NtpSource { host: "ntp.nic.cz",          port: 123, stratum: 1, tier: NtpTier::Stratum1, nts: false, region: "Europe" },
+    NtpSource { host: "ntp1.fau.de",         port: 123, stratum: 1, tier: NtpTier::Stratum1, nts: false, region: "Europe" },
+    NtpSource { host: "ntp-p1.obspm.fr",     port: 123, stratum: 1, tier: NtpTier::Stratum1, nts: false, region: "Europe" },
+    NtpSource { host: "ntp.time.nl",         port: 123, stratum: 1, tier: NtpTier::Nts,      nts: true,  region: "Europe" },
+    NtpSource { host: "tempus3.gum.gov.pl",  port: 123, stratum: 1, tier: NtpTier::Stratum1, nts: false, region: "Europe" },
 
     // Tier-3: Pool fallback
     NtpSource { host: "0.pool.ntp.org",      port: 123, stratum: 2, tier: NtpTier::Pool, nts: false, region: "Global"  },
@@ -248,3 +255,35 @@ pub fn to_source_status(results: &[NtpResult], all_sources: &[NtpSource]) -> Vec
 }
 
 
+
+/// Resolve hostname to IP string for deduplication
+fn resolve_ip(host: &str) -> Option<String> {
+    use std::net::ToSocketAddrs;
+    format!("{}:123", host)
+        .to_socket_addrs().ok()?
+        .next()
+        .map(|a| a.ip().to_string())
+}
+
+/// Deduplicate NTP results by resolved IP + limit Pool to max 1
+pub fn dedup_sources(results: Vec<NtpResult>) -> Vec<NtpResult> {
+    let mut seen_ips: std::collections::HashSet<String> = std::collections::HashSet::new();
+    let mut pool_count = 0usize;
+    let mut deduped = Vec::new();
+
+    for r in results {
+        if matches!(r.tier, NtpTier::Pool) {
+            if pool_count >= 1 { continue; }
+            pool_count += 1;
+        }
+        if let Some(ip) = resolve_ip(&r.host) {
+            if seen_ips.contains(&ip) {
+                eprintln!("[dedup] {} skipped — same IP as previous source", r.host);
+                continue;
+            }
+            seen_ips.insert(ip);
+        }
+        deduped.push(r);
+    }
+    deduped
+}
