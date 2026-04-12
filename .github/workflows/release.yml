@@ -2,34 +2,60 @@ name: Release
 
 on:
   push:
-    branches: [main]
+    branches: [ main ]
 
 permissions:
   contents: write
 
 jobs:
   build:
+    name: Build static binary (Linux x86_64)
     runs-on: ubuntu-22.04
+
     steps:
-      - uses: actions/checkout@v3
+      - uses: actions/checkout@v4
 
-      - name: Install Rust
+      - name: Install Rust + musl target
         uses: dtolnay/rust-toolchain@stable
+        with:
+          targets: x86_64-unknown-linux-musl
 
-      - name: Build release binary
-        run: cargo build --release
+      - name: Install musl tools
+        run: sudo apt-get install -y musl-tools
 
-      - name: Delete existing release
+      - name: Cache cargo
+        uses: actions/cache@v4
+        with:
+          path: |
+            ~/.cargo/registry
+            ~/.cargo/git
+            daemon/target
+          key: ${{ runner.os }}-musl-${{ hashFiles('daemon/Cargo.lock') }}
+
+      - name: Build static binary
         run: |
-          gh release delete latest --yes || true
-          git push origin :refs/tags/latest || true
-        env:
-          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          cd daemon
+          cargo build --release --target x86_64-unknown-linux-musl
+          strip target/x86_64-unknown-linux-musl/release/strontium
 
-      - name: Create new release
+      - name: Verify binary
+        run: |
+          file daemon/target/x86_64-unknown-linux-musl/release/strontium
+          ldd daemon/target/x86_64-unknown-linux-musl/release/strontium || true
+
+      - name: Get version
+        id: version
+        run: |
+          VERSION=$(grep '^version' daemon/Cargo.toml | head -1 | cut -d'"' -f2)
+          SHORT_SHA=$(echo $GITHUB_SHA | cut -c1-7)
+          echo "tag=v${VERSION}-${SHORT_SHA}" >> $GITHUB_OUTPUT
+          echo "name=X1 Strontium v${VERSION} (${SHORT_SHA})" >> $GITHUB_OUTPUT
+
+      - name: Create Release
         uses: softprops/action-gh-release@v2
         with:
-          tag_name: latest
-          name: Latest Build
-          files: target/release/strontium
-          token: ${{ secrets.GITHUB_TOKEN }}
+          tag_name: ${{ steps.version.outputs.tag }}
+          name: ${{ steps.version.outputs.name }}
+          body: Decentralized time oracle for X1 blockchain. Static binary for all Linux x86_64 distributions.
+          files: daemon/target/x86_64-unknown-linux-musl/release/strontium:strontium-linux-x86_64
+          make_latest: true
