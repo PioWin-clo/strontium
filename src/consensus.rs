@@ -170,6 +170,7 @@ pub fn run_consensus_cycle(ntp_results: &[NtpResult], tier_threshold_ms: i64) ->
 ///   t+40s → backup-2 if still silent
 ///
 /// Returns (is_my_turn, window_id, seconds_until_next_window)
+#[allow(dead_code)]
 pub fn rotation_my_turn(
     _my_pubkey_bytes: &[u8; 32],
     my_index: usize,

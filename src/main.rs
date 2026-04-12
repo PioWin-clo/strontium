@@ -237,7 +237,7 @@ fn run_daemon(config: StrontiumConfig) {
 
         // Refresh oracle list from chain every 100 cycles (~inteval*100 seconds)
         if rotation_state.last_fetch_slot == 0 ||
-           cycle_num % 100 == 0 {
+           cycle_num.is_multiple_of(100) {
             if let Ok(submissions) = rpc.get_oracle_submissions(&config.oracle_pda) {
                 let current_slot = rpc.get_current_slot().unwrap_or(0);
                 let changed = rotation_state.refresh_from_submissions(

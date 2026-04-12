@@ -180,6 +180,7 @@ impl RotationState {
     }
 
     /// Human-readable status lines for x1sr status output
+    #[allow(dead_code)]
     pub fn status_lines(
         &self,
         my_pubkey:     &[u8; 32],
@@ -233,6 +234,7 @@ pub enum OracleRole {
 }
 
 impl OracleRole {
+    #[allow(dead_code)]
     pub fn label(&self) -> &str {
         match self {
             OracleRole::Solo      => "solo",
@@ -253,7 +255,7 @@ fn rotation_hash(slot_hash: &[u8; 32], window_id: u64) -> [u8; 32] {
     let mut h = Sha256::new();
     h.update(b"strontium:rotation:v1:");
     h.update(slot_hash);
-    h.update(&window_id.to_le_bytes());
+    h.update(window_id.to_le_bytes());
     let result = h.finalize();
     let mut out = [0u8; 32];
     out.copy_from_slice(&result[..32]);
