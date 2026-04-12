@@ -115,7 +115,7 @@ impl RpcClient {
     }
 
     pub fn get_recent_blockhash(&mut self) -> Result<[u8; 32], String> {
-        let payload = r#"{"jsonrpc":"2.0","id":1,"method":"getLatestBlockhash","params":[{"commitment":"confirmed"}]}"#;
+        let payload = r#"{"jsonrpc":"2.0","id":1,"method":"getLatestBlockhash","params":[{"commitment":"finalized"}]}"#;
         self.rpc_call_with_retry(payload, |resp| parse_blockhash(&resp))
     }
 
