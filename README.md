@@ -50,22 +50,22 @@ Each submission includes a `sources_bitmap` so every round is fully auditable on
 ## Architecture
 
 ```
-Validator Server                          X1 Blockchain
-┌──────────────────────────┐    ┌─────────────────────────────────┐
-│  Tachyon Validator       │    │                                 │
-│                          │    │  OracleState PDA                │
-│  Strontium Daemon   ─TX─▶│    │  ┌───────────────────────────┐ │
-│  ┌────────────────────┐  │    │  │  trusted_time_ms          │ │
-│  │  NTP Autodiscovery │  │    │  │  spread_ms                │ │
-│  │  ┌──────────────┐  │  │    │  │  confidence               │ │
-│  │  │  GPS/PPS t-0 │  │  │    │  │  sources_bitmap           │ │
-│  │  │  NTS      t-1│  │  │    │  │  ring_buffer[288]         │ │
-│  │  │  Stratum1 t-2│  │  │    │  └───────────────────────────┘ │
-│  │  │  Pool     t-3│  │  │    │                                 │
-│  │  └──────────────┘  │  │    │  ValidatorRegistration PDA     │
-│  │  Parallel queries  │  │    │  (TTL: 90 days, stake-checked) │
-│  └────────────────────┘  │    │                                 │
-└──────────────────────────┘    └─────────────────────────────────┘
+Validator Server                        X1 Blockchain
+┌──────────────────────────┐       ┌─────────────────────────────────┐
+│  Tachyon Validator       │       │                                 │
+│                          │       │  OracleState PDA                │
+│  Strontium Daemon ──TX──▶│       │ ┌───────────────────────────┐   │
+│  ┌────────────────────┐  │       │ │  trusted_time_ms          │   │
+│  │  NTP Autodiscovery │  │       │ │  spread_ms                │   │
+│  │  ┌──────────────┐  │  │       │ │  confidence               │   │
+│  │  │  GPS/PPS t-0 │  │  │       │ │  sources_bitmap           │   │
+│  │  │  NTS     t-1 │  │  │       │ │  ring_buffer[288]         │   │
+│  │  │  Stratum1 t-2│  │  │       │ └───────────────────────────┘   │
+│  │  │  Pool    t-3 │  │  │       │                                 │
+│  │  └──────────────┘  │  │       │  ValidatorRegistration PDA      │
+│  │  Parallel queries  │  │       │  (TTL: 90 days, stake-checked)  │
+│  └────────────────────┘  │       │                                 │
+└──────────────────────────┘       └─────────────────────────────────┘
 ```
 
 Each transaction contains two instructions (memo optional):
@@ -78,7 +78,7 @@ Each transaction contains two instructions (memo optional):
 
 | Requirement | Details |
 |---|---|
-| **OS** | Ubuntu 22.04 LTS or newer (GLIBC 2.35+) |
+| **OS** | Ubuntu 18.04 or newer, any Linux x86_64 |
 | **Solana CLI** | Installed and in PATH (`solana-keygen` must work) |
 | **XNT balance** | ≥1 XNT on oracle keypair |
 | **Self-stake** | ≥100 XNT verified on your validator |
@@ -90,8 +90,7 @@ Each transaction contains two instructions (memo optional):
 > ```bash
 > nc -zu pool.ntp.org 123 && echo "OK — port open" || echo "BLOCKED — open with: sudo ufw allow out 123/udp"
 > ```
-
-> **Other Linux distributions:** Compile from source:
+> **Compile from source (any Linux distribution):**
 > ```bash
 > git clone https://github.com/PioWin-clo/strontium
 > cd strontium/daemon && cargo build --release
@@ -104,10 +103,14 @@ Each transaction contains two instructions (memo optional):
 ### Step 1 — Download binary
 
 ```bash
-wget https://github.com/PioWin-clo/strontium/releases/latest/download/strontium
+wget https://github.com/PioWin-clo/strontium/releases/latest/download/strontium-linux-x86_64 -O strontium
 chmod +x strontium
+sudo mv strontium /usr/local/bin/strontium
+sudo ln -sf /usr/local/bin/strontium /usr/local/bin/x1sr
 x1sr help
 ```
+
+> **Static binary** — works on Ubuntu 18.04, 20.04, 22.04, 24.04, Debian, CentOS and any Linux x86_64 without GLIBC version requirements.
 
 ### Step 2 — Generate oracle keypair
 
@@ -129,7 +132,7 @@ solana-keygen pubkey ~/.config/strontium/oracle-keypair.json
 # Send XNT to that address via XDEX, Backpack, CLI, or Ledger
 ```
 
-Use the **[cost calculator](https://piowin-clo.github.io/strontium)** to choose the right amount for your interval and number of operators.
+Use the **[cost calculator](https://piowin-clo.github.io/strontium)** to choose the right amount for your interval.
 
 ### Step 4 — Register
 
@@ -164,7 +167,8 @@ echo "Strontium PID: $!"
 
 ```bash
 x1sr status
-tail -f ~/strontium.log   # You should see: ✅ submit OK — tx: ...
+tail -f ~/strontium.log
+# You should see: ✅ submit OK — tx: ...
 ```
 
 ### Step 6 — Install as system service
@@ -204,23 +208,24 @@ x1sr uninstall          Remove systemd service
 | `keypair` | `~/.config/strontium/oracle-keypair.json` | Oracle keypair path |
 | `vote_keypair` | auto-detect | Vote keypair path |
 | `rpc` | localhost + mainnet | Add RPC endpoint (prepended to list) |
-| `committee` | *(empty = solo)* | Add oracle pubkey to rotation committee |
-| `committee_clear` | — | Clear committee list |
+| `rotation` | `true` | Auto-rotation enabled (false = always submit) |
 | `dry_run` | `false` | Test mode (true/false) |
 | `memo` | `true` | Include Memo Program in TX (false = lower compute units) |
 
 ---
 
-## Rotation — Sharing the Cost
+## How Cost Scales Automatically
 
-Multiple validators can coordinate submissions to share costs and improve coverage. The daemon uses deterministic round-robin rotation — **no communication between servers needed**:
+X1 Strontium uses **automatic slot-hash based rotation** — no manual configuration needed. After registration, each daemon independently discovers other active oracles on-chain and distributes submissions evenly.
+
+The more validators join, the lower the cost for everyone — **automatically, with zero coordination**.
 
 ```
 window_id = current_time / interval_s
-primary   = window_id % committee_size
+winner    = SHA256(slot_hash || window_id) % n_active_oracles
 ```
 
-Every daemon independently calculates whose turn it is. A faster server or better connection gives no advantage — the result is the same for everyone.
+Each daemon independently calculates whose turn it is. The slot hash is unpredictable — no one can game the rotation in advance.
 
 **Staged fallback** (prevents gaps if primary is offline):
 
@@ -228,18 +233,7 @@ Every daemon independently calculates whose turn it is. A faster server or bette
 - `t + 30s` → backup-1 submits if primary was silent
 - `t + 60s` → backup-2 submits if still silent
 
-**How to configure rotation:**
-
-```bash
-# Add both oracle pubkeys to the committee (run on both servers)
-x1sr config set committee <PRIME_ORACLE_PUBKEY>
-x1sr config set committee <SENTINEL_ORACLE_PUBKEY>
-
-# Verify
-x1sr config show
-```
-
-The list is automatically sorted — the order you add them doesn't matter. Restart the daemon after changes.
+**Solo mode** is automatic when fewer than 2 oracles are active — the daemon detects this and submits every window without waiting.
 
 ---
 
@@ -247,24 +241,25 @@ The list is automatically sorted — the order you add them doesn't matter. Rest
 
 Each transaction costs **0.002 XNT** (verified on-chain). Use the **[interactive cost calculator](https://piowin-clo.github.io/strontium)** to model your exact setup.
 
-Quick reference (cost per operator):
+Quick reference (auto-rotation, cost per operator):
 
-| Operators | Interval | TX/day/op | XNT/month/op | On-chain accuracy |
-|---|---|---|---|---|
-| 1 (solo) | 300s | 288 | ~17.3 XNT | ±3–10 ms |
-| 2 (committee) | 300s | 144 | ~8.6 XNT | ±2–6 ms |
-| 5 (committee) | 300s | 58 | ~3.5 XNT | ±2–6 ms |
-| 10 (committee) | 300s | 29 | ~1.7 XNT | ±2–5 ms |
-| 50 (committee) | 300s | 6 | ~0.35 XNT | ±1–4 ms |
-| any + GPS/PPS | any | — | — | ±50 nanoseconds |
+| Operators | Interval | XNT/month/op | On-chain accuracy |
+|---|---|---|---|
+| 1 | 300s | ~17.3 XNT | ±3–10 ms |
+| 2 | 300s | ~8.6 XNT | ±2–6 ms |
+| 5 | 300s | ~3.5 XNT | ±2–6 ms |
+| 10 | 300s | ~1.7 XNT | ±2–5 ms |
+| 50 | 300s | ~0.35 XNT | ±1–4 ms |
+| any + GPS/PPS | any | — | ±50 nanoseconds |
 
 > When XNT price rises, the right response is more operators sharing the cost — not degrading the service by increasing the interval.
 
 Change interval:
 
 ```bash
-x1sr config set interval 600    # every 10 minutes
-x1sr config set interval 3600   # every hour
+x1sr config set interval 60    # every minute
+x1sr config set interval 600   # every 10 minutes
+x1sr config set interval 3600  # every hour
 ```
 
 ---
@@ -298,7 +293,7 @@ x1sr config set interval 3600   # every hour
 
 All sources queried in parallel. List refreshed every hour. Sources are deduplicated by resolved IP (anycast pool protection). The daemon selects the 5 best sources per cycle by tier priority, then RTT, requiring at least 3 Stratum-1 or better.
 
-**GPS/PPS (optional):** The daemon auto-detects `/dev/pps0` at startup. If present, GPS/PPS is used as tier-0 (±50ns accuracy) with NTP as cross-check. If absent, falls back to NTP automatically — **no configuration needed, no errors**. Recommended hardware: u-blox NEO-M8N (~$30 USB).
+**GPS/PPS (optional):** The daemon auto-detects `/dev/pps0` at startup. If present, GPS/PPS is used as tier-0 (±50ns accuracy) with NTP as cross-check. If absent, falls back to NTP automatically — **no configuration needed, no errors**. Recommended hardware: u-blox NEO-M8N (~$50 USB).
 
 ---
 
@@ -333,8 +328,8 @@ For on-chain integration via Anchor, read the `OracleState` account at the Oracl
 **Daemon silent for many cycles:**
 
 ```bash
-x1sr status    # check silent_reason field
-x1sr sources   # check which NTP servers respond
+x1sr status      # check silent_reason field
+x1sr sources     # check which NTP servers respond
 ```
 
 | Silent reason | What to do |
@@ -357,7 +352,7 @@ x1sr sources   # check which NTP servers respond
 | `Insufficient self-stake` | Increase self-stake to ≥100 XNT via XDEX Valistake |
 | `Skip rate too high` | Wait for validator skip rate to drop below 10% |
 
-**Binary won't run (`GLIBC not found`):**
+**Binary won't run:**
 
 ```bash
 git clone https://github.com/PioWin-clo/strontium
@@ -378,6 +373,7 @@ Program upgrades require physical Ledger confirmation. The oracle fee-payer key 
 | Single validator lying | On-chain outlier check: rejected if timestamp deviates >10s from `Clock` |
 | Coordinated timestamp manipulation | Stake-weighted median — requires majority of submitters |
 | NTP MITM | Multi-continental cross-check (50ms threshold) + cross-tier validation |
+| Rotation gaming | Slot-hash entropy — unpredictable until ~150ms before block commit |
 | Submission spam | ValidatorRegistration required (vote proof + stake check) |
 | Oracle key compromise | Only oracle keypair exposed — identity/vote/upgrade authority untouched |
 | GPS spoofing | Cross-checked against NTP consensus (±5s threshold) |
@@ -389,15 +385,14 @@ Program upgrades require physical Ledger confirmation. The oracle fee-payer key 
 
 ## Pre-Mainnet Checklist
 
-Before running in production with a live committee:
+Before running in production:
 
 - [ ] Oracle keypair funded (`x1sr balance` — at least 30 days runway)
 - [ ] Registration confirmed (`x1sr status` shows `running`)
 - [ ] Dry-run completed successfully for at least 3 cycles
 - [ ] NTP sources responding (`x1sr sources` shows ≥3 active)
 - [ ] Port 123/UDP open outbound
-- [ ] Committee configured on all nodes if running rotation
-- [ ] Failover tested: stop primary, verify backup submits within 60s
+- [ ] Failover tested: stop daemon, verify backup submits within 60s
 - [ ] systemd service installed (`sudo x1sr install`)
 
 ---
@@ -413,16 +408,17 @@ Before running in production with a live committee:
 - [x] Automatic systemd installer
 - [x] Memo Program in every transaction — full transparency (optional via config)
 - [x] Circuit breaker RPC with exponential backoff
-- [x] Deterministic round-robin rotation (`slot % n`) — fair cost sharing
-- [x] `ed25519-dalek` v2, clean Clippy, security audit
 - [x] Cross-tier consensus validation (at least 2 independent tiers must agree)
 - [x] IP deduplication — pool anycast protection
 - [x] On-chain outlier slashing — reject submissions >10s from `Clock`
 - [x] Upgrade authority on cold Ledger storage
 - [x] Interactive cost calculator — [piowin-clo.github.io/strontium](https://piowin-clo.github.io/strontium)
-- [ ] GPS/PPS production-tested path (hardware required)
+- [x] **Auto-rotation** — slot-hash based, zero config, automatic cost sharing
+- [x] Static binary — works on all Linux x86_64 (musl, no GLIBC requirements)
+- [ ] GPS/PPS production-tested path (hardware required: ~$50 u-blox NEO-M8N)
 - [ ] Full NTS client-side protocol (cryptographic handshake)
 - [ ] Dashboard — consensus visualization, history, validator health
+- [ ] Oracle discovery from chain (v2 — enables full auto-rotation with live oracle list)
 - [ ] Alpenglow integration (τₖ phase-lock — the missing time layer for eigenvm)
 
 ---
@@ -433,5 +429,5 @@ X1 Strontium is open-source infrastructure for the X1 ecosystem. Built with Anch
 
 **Standing on open shoulders:** X1 Strontium was conceived independently, but could not exist without Jack Levin's vision and the work of the entire X1 team — Photon Oracle, Entropy Engine, and the X1 blockchain itself. Jack and his team built the foundation. We built on it.
 
-**Concept & architecture:** PioWin
+**Concept & architecture:** PioWin  
 **Code:** Claude (Anthropic) with support from Theo (Cyberdyne)
