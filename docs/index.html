@@ -8,18 +8,16 @@
   *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
   body {
     font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
-    background: #0d1117;
-    color: #e6edf3;
-    min-height: 100vh;
-    padding: 2rem 1rem;
+    background: #0d1117; color: #e6edf3;
+    min-height: 100vh; padding: 2rem 1rem;
   }
-  .container { max-width: 900px; margin: 0 auto; }
+  .container { max-width: 960px; margin: 0 auto; }
   header { margin-bottom: 2rem; }
-  header h1 { font-size: 1.5rem; font-weight: 500; color: #e6edf3; }
+  header h1 { font-size: 1.5rem; font-weight: 500; }
   header p { font-size: 0.875rem; color: #8b949e; margin-top: 0.25rem; }
   .badge {
     display: inline-block; margin-top: 0.5rem;
-    font-size: 0.75rem; padding: 2px 8px;
+    font-size: 0.75rem; padding: 2px 10px;
     background: #1f2937; border: 1px solid #374151;
     border-radius: 20px; color: #60a5fa;
   }
@@ -27,70 +25,64 @@
     display: grid; grid-template-columns: 1fr 1fr;
     gap: 1rem; margin-bottom: 1.5rem;
   }
-  @media (max-width: 500px) { .controls { grid-template-columns: 1fr; } }
-  .control-card {
-    background: #161b22;
-    border: 1px solid #30363d;
-    border-radius: 8px;
-    padding: 1rem;
+  @media (max-width: 520px) { .controls { grid-template-columns: 1fr; } }
+  .ctrl {
+    background: #161b22; border: 1px solid #30363d;
+    border-radius: 8px; padding: 1rem;
   }
-  .control-card label {
-    display: block; font-size: 0.75rem;
-    color: #8b949e; margin-bottom: 0.5rem;
-    text-transform: uppercase; letter-spacing: 0.05em;
+  .ctrl label {
+    display: block; font-size: 0.7rem; color: #8b949e;
+    text-transform: uppercase; letter-spacing: 0.06em; margin-bottom: 0.5rem;
   }
-  .control-row { display: flex; align-items: center; gap: 10px; }
+  .ctrl-row { display: flex; align-items: center; gap: 10px; }
   input[type=range] {
-    flex: 1; -webkit-appearance: none; appearance: none;
-    height: 4px; background: #30363d; border-radius: 2px; outline: none;
+    flex: 1; -webkit-appearance: none; height: 4px;
+    background: #30363d; border-radius: 2px; outline: none;
   }
   input[type=range]::-webkit-slider-thumb {
     -webkit-appearance: none; width: 16px; height: 16px;
     border-radius: 50%; background: #1f6feb; cursor: pointer;
   }
-  .val {
-    font-size: 1rem; font-weight: 500; color: #e6edf3;
-    min-width: 70px; text-align: right;
+  .val { font-size: 1rem; font-weight: 500; min-width: 64px; text-align: right; }
+  .stat { font-size: 1.5rem; font-weight: 500; }
+  .stat-sub { font-size: 0.75rem; color: #8b949e; margin-top: 3px; }
+  .mode-btns { display: flex; gap: 8px; margin-top: 4px; }
+  .mode-btns label {
+    display: flex; align-items: center; gap: 6px;
+    font-size: 0.875rem; color: #e6edf3;
+    text-transform: none; letter-spacing: 0; cursor: pointer;
   }
-  .stat { font-size: 1.5rem; font-weight: 500; color: #e6edf3; }
-  .stat-sub { font-size: 0.75rem; color: #8b949e; margin-top: 2px; }
   .note {
-    background: #161b22; border: 1px solid #21262d;
-    border-left: 3px solid #1f6feb;
+    background: #161b22; border-left: 3px solid #1f6feb;
     border-radius: 6px; padding: 0.75rem 1rem;
     font-size: 0.8rem; color: #8b949e; margin-bottom: 1.5rem;
+    line-height: 1.6;
   }
   .note strong { color: #60a5fa; }
   table {
-    width: 100%; border-collapse: collapse;
-    font-size: 0.875rem;
-    background: #161b22;
-    border: 1px solid #30363d;
+    width: 100%; border-collapse: collapse; font-size: 0.875rem;
+    background: #161b22; border: 1px solid #30363d;
     border-radius: 8px; overflow: hidden;
   }
   thead tr { background: #21262d; }
   th {
     padding: 10px 14px; text-align: right;
     font-weight: 500; color: #8b949e;
-    font-size: 0.75rem; text-transform: uppercase; letter-spacing: 0.05em;
+    font-size: 0.7rem; text-transform: uppercase; letter-spacing: 0.06em;
   }
   th:first-child { text-align: left; }
   td { padding: 10px 14px; text-align: right; border-top: 1px solid #21262d; }
   td:first-child { text-align: left; font-weight: 500; color: #e6edf3; }
-  tr.highlight { background: #0d2136; }
-  tr.highlight td { color: #60a5fa; }
+  tr.hl { background: #0d2136; }
+  tr.hl td { color: #60a5fa; }
   tr:hover { background: #1c2128; }
   .warn { color: #f97316; }
   .tag {
-    font-size: 0.7rem; padding: 1px 6px;
+    font-size: 0.68rem; padding: 1px 6px;
     background: #1f6feb22; color: #60a5fa;
-    border: 1px solid #1f6feb44;
-    border-radius: 10px; margin-left: 6px;
+    border: 1px solid #1f6feb44; border-radius: 10px; margin-left: 5px;
   }
-  footer {
-    margin-top: 2rem; font-size: 0.75rem; color: #484f58;
-    text-align: center;
-  }
+  footer { margin-top: 2rem; font-size: 0.75rem; color: #484f58; text-align: center; }
   footer a { color: #1f6feb; text-decoration: none; }
 </style>
 </head>
@@ -103,54 +95,49 @@
   </header>
 
   <div class="note">
-    <strong>Committee mode:</strong> when multiple validators share a committee, each submits every
-    <em>N × interval</em> seconds — total cost stays the same as 1 solo validator.
-    Solo mode (no committee): each server submits independently — costs multiply linearly.
+    <strong>Solo mode:</strong> each server submits independently — costs multiply by N.<br>
+    <strong>Committee mode:</strong> validators share submissions via round-robin rotation — total network cost = 1 solo server. The table shows <em>cost per operator</em> (total ÷ N).
   </div>
 
   <div class="controls">
-    <div class="control-card">
+    <div class="ctrl">
       <label>Submit interval</label>
-      <div class="control-row">
+      <div class="ctrl-row">
         <input type="range" id="interval" min="60" max="3600" step="60" value="300">
         <span class="val" id="interval-out">5 min</span>
       </div>
     </div>
-    <div class="control-card">
+    <div class="ctrl">
       <label>XNT price (USD)</label>
-      <div class="control-row">
+      <div class="ctrl-row">
         <input type="range" id="price" min="0.01" max="10" step="0.01" value="0.44">
         <span class="val" id="price-out">$0.44</span>
       </div>
     </div>
-    <div class="control-card">
+    <div class="ctrl">
       <label>Tx/day (single server)</label>
       <div class="stat" id="txday">288</div>
-      <div class="stat-sub">@ 300s interval</div>
+      <div class="stat-sub" id="txday-sub">@ 5 min interval</div>
     </div>
-    <div class="control-card">
+    <div class="ctrl">
       <label>Mode</label>
-      <div style="display:flex;gap:8px;margin-top:4px;">
-        <label style="display:flex;align-items:center;gap:6px;font-size:0.875rem;color:#e6edf3;text-transform:none;letter-spacing:0;">
-          <input type="radio" name="mode" value="solo" checked> Solo
-        </label>
-        <label style="display:flex;align-items:center;gap:6px;font-size:0.875rem;color:#e6edf3;text-transform:none;letter-spacing:0;">
-          <input type="radio" name="mode" value="committee"> Committee
-        </label>
+      <div class="mode-btns">
+        <label><input type="radio" name="mode" value="solo" checked> Solo</label>
+        <label><input type="radio" name="mode" value="committee"> Committee</label>
       </div>
-      <div class="stat-sub" style="margin-top:6px;" id="mode-desc">each server submits independently</div>
+      <div class="stat-sub" id="mode-desc" style="margin-top:6px;">each server submits independently</div>
     </div>
   </div>
 
   <table>
     <thead>
       <tr>
-        <th>servers</th>
-        <th>tx/day</th>
-        <th>XNT/day</th>
-        <th>XNT/month</th>
-        <th>$/day</th>
-        <th>$/month</th>
+        <th>operators</th>
+        <th>tx/day/op</th>
+        <th>XNT/day/op</th>
+        <th>XNT/month/op</th>
+        <th>$/day/op</th>
+        <th>$/month/op</th>
         <th>runway (2 XNT)</th>
       </tr>
     </thead>
@@ -159,7 +146,7 @@
 
   <footer>
     <p>Source: <a href="https://github.com/PioWin-clo/strontium">github.com/PioWin-clo/strontium</a>
-    &nbsp;·&nbsp; fee hardcoded in <code>submitter.rs</code> &nbsp;·&nbsp;
+    &nbsp;·&nbsp; fee verified in <code>submitter.rs</code> &nbsp;·&nbsp;
     <a href="https://explorer.mainnet.x1.xyz/address/EtjkQqf1h9gtwHpi2QPRTefWg3XmDfmjQ6YozYZspJzn">oracle PDA</a>
     </p>
   </footer>
@@ -168,67 +155,62 @@
 <script>
 const FEE = 0.002;
 const SERVERS = [1, 2, 3, 5, 10, 50, 100, 500, 1000];
-const HIGHLIGHT = [2];
+const HL = 2;
 
-function fmt2(n) { return n.toFixed(2); }
-function fmt3(n) { return n.toFixed(3); }
-function fmt4(n) { return n.toFixed(4); }
-
-function runway(balance, costPerDay) {
-  if (costPerDay === 0) return '∞';
-  const days = balance / costPerDay;
-  if (days < 1) return '<1 day';
-  if (days < 30) return Math.round(days) + ' days';
-  if (days < 365) return (days / 30).toFixed(1) + ' mo';
-  return (days / 365).toFixed(1) + ' yr';
+function runway(bal, costPerDay) {
+  if (!costPerDay) return '∞';
+  const d = bal / costPerDay;
+  if (d < 1) return '<1 day';
+  if (d < 30) return Math.round(d) + ' days';
+  if (d < 365) return (d/30).toFixed(1) + ' mo';
+  return (d/365).toFixed(1) + ' yr';
 }
 
 function update() {
-  const intervalS = +document.getElementById('interval').value;
+  const intS  = +document.getElementById('interval').value;
   const price = +document.getElementById('price').value;
-  const mode = document.querySelector('input[name=mode]:checked').value;
+  const mode  = document.querySelector('input[name=mode]:checked').value;
+  const comm  = mode === 'committee';
 
-  const mins = intervalS / 60;
-  const label = mins >= 60 ? (mins/60).toFixed(0) + 'h' : mins.toFixed(0) + ' min';
-  document.getElementById('interval-out').textContent = label;
+  const mins = intS / 60;
+  document.getElementById('interval-out').textContent =
+    mins >= 60 ? (mins/60).toFixed(0) + 'h' : mins.toFixed(0) + ' min';
   document.getElementById('price-out').textContent = '$' + price.toFixed(2);
 
-  const txSingle = Math.round(86400 / intervalS);
-  document.getElementById('txday').textContent = txSingle.toLocaleString();
-  document.getElementById('txday').nextElementSibling.textContent = '@ ' + label + ' interval';
-
-  document.getElementById('mode-desc').textContent = mode === 'committee'
-    ? 'total cost shared — same as 1 solo server'
+  const txSolo = Math.round(86400 / intS);
+  document.getElementById('txday').textContent = txSolo.toLocaleString();
+  document.getElementById('txday-sub').textContent = '@ ' + document.getElementById('interval-out').textContent + ' interval';
+  document.getElementById('mode-desc').textContent = comm
+    ? 'cost shown per operator (total ÷ N)'
     : 'each server submits independently';
 
   const tbody = document.getElementById('tbody');
   tbody.innerHTML = '';
 
   SERVERS.forEach(n => {
-    const effectiveN = (mode === 'committee') ? 1 : n;
-    const txDay = txSingle * effectiveN;
-    const xntDay = FEE * txDay;
-    const xntMon = xntDay * 30;
-    const usdDay = xntDay * price;
-    const usdMon = xntMon * price;
-    const rw = runway(2, xntDay);
+    // Solo: each server does full txSolo per day
+    // Committee: total network = txSolo, split evenly per operator
+    const txPerOp  = comm ? txSolo / n : txSolo;
+    const xntDay   = FEE * txPerOp;
+    const xntMon   = xntDay * 30;
+    const usdDay   = xntDay * price;
+    const usdMon   = xntMon * price;
+    const rw       = runway(2, xntDay);
+    const isHl     = n === HL;
+    const bigWarn  = !comm && n >= 500;
 
-    const isH = HIGHLIGHT.includes(n);
-    const bigN = n >= 100;
+    let firstCell = n.toLocaleString();
+    if (isHl) firstCell += ' <span class="tag">your setup</span>';
+    if (comm && n > 1) firstCell += ' <span class="tag">shared</span>';
 
-    let serverCell = n.toLocaleString();
-    if (isH) serverCell += ' <span class="tag">your setup</span>';
-    if (mode === 'committee' && n > 1) serverCell += ' <span class="tag">shared</span>';
-
-    const warnClass = n >= 500 ? 'warn' : '';
-
-    tbody.innerHTML += `<tr class="${isH ? 'highlight' : ''}">
-      <td>${serverCell}</td>
-      <td class="${warnClass}">${txDay.toLocaleString()}</td>
-      <td>${fmt3(xntDay)}</td>
-      <td class="${bigN && mode !== 'committee' ? 'warn' : ''}">${fmt2(xntMon)}</td>
-      <td>$${fmt4(usdDay)}</td>
-      <td class="${bigN && mode !== 'committee' ? 'warn' : ''}">$${fmt2(usdMon)}</td>
+    const w = bigWarn ? 'warn' : '';
+    tbody.innerHTML += `<tr class="${isHl ? 'hl' : ''}">
+      <td>${firstCell}</td>
+      <td class="${w}">${txPerOp % 1 === 0 ? txPerOp.toLocaleString() : txPerOp.toFixed(1)}</td>
+      <td>${xntDay.toFixed(4)}</td>
+      <td class="${w}">${xntMon.toFixed(3)}</td>
+      <td>$${usdDay.toFixed(4)}</td>
+      <td class="${w} " style="font-weight:500">$${usdMon.toFixed(2)}</td>
       <td>${rw}</td>
     </tr>`;
   });
