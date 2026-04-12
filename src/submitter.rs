@@ -228,9 +228,10 @@ impl RpcClient {
 // ─── Transaction Builder ──────────────────────────────────────────────────────
 
 pub struct SubmitParams<'a> {
-    pub consensus:    &'a ConsensusResult,
-    pub window_id:    u64,
-    pub memo_enabled: bool,
+    pub consensus:     &'a ConsensusResult,
+    pub window_id:     u64,
+    pub memo_enabled:  bool,
+    pub chain_time_ms: Option<i64>,
 }
 
 pub fn build_submit_transaction(
@@ -254,11 +255,35 @@ pub fn build_submit_transaction(
     ix_data.push((consensus.confidence * 100.0) as u8);
     ix_data.push(consensus.sources_bitmap);
 
-    let memo_str  = format!(
-        "strontium:v1:w={}:t={}:c={}:s={}",
-        window_id, consensus.timestamp_ms,
+    // Format NTP time as HH:MM:SS.mmmm
+    let ntp_ms   = consensus.timestamp_ms;
+    let ntp_s    = ntp_ms / 1000;
+    let ntp_frac = (ntp_ms % 1000) * 10; // 4 decimal places (0.1ms)
+    let ntp_h    = (ntp_s % 86400) / 3600;
+    let ntp_m    = (ntp_s % 3600) / 60;
+    let ntp_sec  = ntp_s % 60;
+
+    // Format chain time as HH:MM:SS.0000
+    let chain_str = if let Some(chain_ms) = params.chain_time_ms {
+        let cs = chain_ms / 1000;
+        format!("{:02}:{:02}:{:02}.0000", (cs % 86400) / 3600, (cs % 3600) / 60, cs % 60)
+    } else {
+        "??:??:??.????".to_string()
+    };
+
+    // Best stratum
+    let best_stratum = consensus.sources.iter()
+        .map(|r| r.stratum)
+        .min()
+        .unwrap_or(0);
+
+    let memo_str = format!(
+        "strontium:v1:w={}:ntp={:02}:{:02}:{:02}.{:04}:chain={}:c={}:s={}:st={}",
+        window_id, ntp_h, ntp_m, ntp_sec, ntp_frac,
+        chain_str,
         (consensus.confidence * 100.0) as u8,
-        consensus.sources_used
+        consensus.sources_used,
+        best_stratum
     );
     let memo_data = memo_str.as_bytes().to_vec();
 

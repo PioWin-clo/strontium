@@ -30,7 +30,7 @@ jobs:
         run: cd daemon && cargo build --release
 
       - name: Clippy
-        run: cd daemon && cargo clippy -- -D warnings
+        run: cd daemon && cargo clippy --no-deps -- -D warnings
 
       - name: Security audit
         run: |

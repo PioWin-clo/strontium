@@ -314,9 +314,10 @@ fn run_daemon(config: StrontiumConfig) {
                     &reg_pda_bytes,
                     &blockhash,
                     &SubmitParams {
-                        consensus:    &consensus,
+                        consensus:     &consensus,
                         window_id,
-                        memo_enabled: config.memo_enabled,
+                        memo_enabled:  config.memo_enabled,
+                        chain_time_ms: get_chain_time_ms(&mut rpc),
                     },
                 );
 
