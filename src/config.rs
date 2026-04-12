@@ -56,7 +56,6 @@ impl Default for StrontiumConfig {
             vote_keypair_path: find_default_vote_keypair(),
             interval_s: DEFAULT_INTERVAL_S,
             rpc_urls: vec![
-                "http://localhost:8899".to_string(),
                 "https://rpc.mainnet.x1.xyz".to_string(),
                 "https://api.mainnet.x1.xyz".to_string(),
             ],
