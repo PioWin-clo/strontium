@@ -58,7 +58,7 @@ pub fn compute_consensus(results: &[NtpResult], tier_threshold_ms: i64) -> Optio
     // Leap second detection: if spread is between 400ms and 1100ms
     // this is likely a leap second event (smearing vs stepping servers)
     // Log warning but still return None — silence is correct behavior
-    if spread_ms >= 400 && spread_ms <= 1100 {
+    if (400..=1100).contains(&spread_ms) {
         eprintln!(
             "[warn] ⚠ LEAP SECOND? Sources diverge {}ms — possible leap second event.              Staying silent. Check https://www.ietf.org/timezones/data/leap-seconds.list",
             spread_ms

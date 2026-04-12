@@ -12,7 +12,7 @@ use config::{StrontiumConfig, ORACLE_PDA};
 use status::{DaemonStatus, SilentReason};
 use ntp_client::{discover_sources, query_sources_parallel, has_gps_pps, dedup_sources};
 use consensus::{run_consensus_cycle, rotation_my_turn, window_has_submission};
-use submitter::{RpcClient, build_submit_transaction, derive_registration_pda,
+use submitter::{RpcClient, build_submit_transaction, SubmitParams, derive_registration_pda,
                 lamports_to_xnt, estimate_days_remaining, get_chain_time_ms};
 use register::{run_register, load_keypair};
 
@@ -297,9 +297,11 @@ fn run_daemon(config: StrontiumConfig) {
                     &oracle_pda_arr,
                     &reg_pda_bytes,
                     &blockhash,
-                    &consensus,
-                    window_id,
-                    config.memo_enabled,
+                    &SubmitParams {
+                        consensus:    &consensus,
+                        window_id,
+                        memo_enabled: config.memo_enabled,
+                    },
                 );
 
                 let tx_b64 = base64_encode(&tx);

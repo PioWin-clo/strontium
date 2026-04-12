@@ -235,6 +235,14 @@ impl RpcClient {
 
 // ─── Transaction Builder ──────────────────────────────────────────────────────
 
+
+/// Parameters for building a submit transaction
+pub struct SubmitParams<'a> {
+    pub consensus:    &'a ConsensusResult,
+    pub window_id:    u64,
+    pub memo_enabled: bool,
+}
+
 /// Build and sign a submit_time transaction with embedded Memo
 pub fn build_submit_transaction(
     keypair:       &SigningKey,
@@ -242,10 +250,11 @@ pub fn build_submit_transaction(
     oracle_pda:    &[u8; 32],
     reg_pda:       &[u8; 32],
     blockhash:     &[u8; 32],
-    consensus:     &ConsensusResult,
-    window_id:     u64,
-    memo_enabled:  bool,
+    params:        &SubmitParams,
 ) -> Vec<u8> {
+    let consensus    = params.consensus;
+    let window_id    = params.window_id;
+    let memo_enabled = params.memo_enabled;
     let oracle_pubkey: [u8; 32] = keypair.verifying_key().to_bytes();
 
     // Build submit_time instruction data
