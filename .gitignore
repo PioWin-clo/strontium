@@ -4,3 +4,5 @@ Cargo.lock
 daemon/Cargo.lock
 *.so
 *.dylib
+src/.DS_Store
+.DS_Store
