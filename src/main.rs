@@ -354,10 +354,22 @@ fn readiness_check(config: &StrontiumConfig, _oracle_pubkey: &str, _rpc: &mut Rp
         Ok(kp) => kp,
         Err(_) => { return; } // Can't load, skip check
     };
-    let vote_pubkey = bs58::encode(vote_kp.verifying_key().to_bytes()).into_string();
+    // Derive identity path from vote path (same dir, identity.json)
+    let identity_path = std::path::Path::new(&vote_path)
+        .parent()
+        .map(|p| p.join("identity.json"))
+        .unwrap_or_default();
+    let check_pubkey = if identity_path.exists() {
+        match load_keypair(identity_path.to_str().unwrap_or("")) {
+            Ok(kp) => bs58::encode(kp.verifying_key().to_bytes()).into_string(),
+            Err(_) => bs58::encode(vote_kp.verifying_key().to_bytes()).into_string(),
+        }
+    } else {
+        bs58::encode(vote_kp.verifying_key().to_bytes()).into_string()
+    };
 
     for attempt in 0..READINESS_MAX_TRIES {
-        if is_validator_active(&vote_pubkey) {
+        if is_validator_active(&check_pubkey) {
             println!("[{}] ✓ Validator is active — starting daemon", now_str());
             return;
         }
@@ -382,7 +394,7 @@ fn is_validator_active(vote_pubkey: &str) -> bool {
     {
         Ok(resp) => {
             let body = resp.into_string().unwrap_or_default();
-            body.contains("\"isActive\":true") || body.contains("\"status\":\"active\"")
+            body.contains("\"active\":true")
         }
         Err(_) => false,
     }
