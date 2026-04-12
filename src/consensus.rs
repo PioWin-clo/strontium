@@ -52,8 +52,19 @@ pub fn compute_consensus(results: &[NtpResult], tier_threshold_ms: i64) -> Optio
         timestamps[n / 2]
     };
 
-    // Spread (max - min)
-    let spread_ms = timestamps[n-1] - timestamps[0];
+    // IQR outlier filter — remove sources >2x IQR from median before spread calc
+    let filtered: Vec<i64> = {
+        let q1 = timestamps[n / 4];
+        let q3 = timestamps[3 * n / 4];
+        let iqr = (q3 - q1).max(5); // min 5ms IQR floor
+        let lo = median_ms - iqr * 3;
+        let hi = median_ms + iqr * 3;
+        timestamps.iter().filter(|&&t| t >= lo && t <= hi).copied().collect()
+    };
+    let filtered = if filtered.len() >= MIN_SOURCES { &filtered } else { &timestamps };
+
+    // Spread (max - min) on filtered set
+    let spread_ms = filtered[filtered.len()-1] - filtered[0];
 
     // Leap second detection: if spread is between 400ms and 1100ms
     // this is likely a leap second event (smearing vs stepping servers)
