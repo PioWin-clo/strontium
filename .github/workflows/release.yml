@@ -30,7 +30,7 @@ jobs:
             ~/.cargo/registry
             ~/.cargo/git
             daemon/target
-          key: ${{ runner.os }}-musl-${{ hashFiles('daemon/Cargo.lock') }}
+          key: ${{ runner.os }}-musl-${{ hashFiles('"daemon/Cargo.lock"') }}
 
       - name: Build static binary
         run: |
@@ -46,7 +46,7 @@ jobs:
       - name: Get version
         id: version
         run: |
-          VERSION=$(grep '^version' daemon/Cargo.toml | head -1 | cut -d'"' -f2)
+          VERSION=$(grep '"^version"' daemon/Cargo.toml | head -1 | cut -d'"""' -f2)
           SHORT_SHA=$(echo $GITHUB_SHA | cut -c1-7)
           echo "tag=v${VERSION}-${SHORT_SHA}" >> $GITHUB_OUTPUT
           echo "name=X1 Strontium v${VERSION} (${SHORT_SHA})" >> $GITHUB_OUTPUT
@@ -56,19 +56,6 @@ jobs:
         with:
           tag_name: ${{ steps.version.outputs.tag }}
           name: ${{ steps.version.outputs.name }}
-          body: |
-            ## X1 Strontium — Decentralized Time Oracle
-
-            **Static binary — works on all Linux x86_64:**
-            Ubuntu 18.04 / 20.04 / 22.04 / 24.04 · Debian · CentOS · Any Linux
-
-            ### Quick install
-```bash
-            wget https://github.com/PioWin-clo/strontium/releases/latest/download/strontium-linux-x86_64
-            chmod +x strontium-linux-x86_64
-            sudo mv strontium-linux-x86_64 /usr/local/bin/strontium
-            sudo ln -sf /usr/local/bin/strontium /usr/local/bin/x1sr
-            x1sr --help
-```
+          body: Decentralized time oracle for X1 blockchain. Static binary for all Linux x86_64.
           files: daemon/target/x86_64-unknown-linux-musl/release/strontium:strontium-linux-x86_64
           make_latest: true
