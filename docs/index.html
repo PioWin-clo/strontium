@@ -4,297 +4,632 @@
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>X1 Strontium — Cost Calculator</title>
+<link href="https://fonts.googleapis.com/css2?family=Space+Mono:wght@400;700&family=IBM+Plex+Sans:wght@300;400;500;600&display=swap" rel="stylesheet">
 <style>
-  *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
-  body {
-    font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
-    background: #0d1117; color: #e6edf3;
-    min-height: 100vh; padding: 2rem 1rem;
+:root {
+  --bg:       #080c10;
+  --surface:  #0d1520;
+  --border:   #1a2535;
+  --border2:  #243040;
+  --text:     #c8d8e8;
+  --muted:    #4a6080;
+  --accent:   #00d4ff;
+  --accent2:  #0099bb;
+  --green:    #00e5a0;
+  --orange:   #ff8c42;
+  --red:      #ff4466;
+  --yellow:   #ffd166;
+  --mono:     'Space Mono', monospace;
+  --sans:     'IBM Plex Sans', sans-serif;
+}
+*,*::before,*::after{box-sizing:border-box;margin:0;padding:0}
+
+body {
+  font-family: var(--sans);
+  background: var(--bg);
+  color: var(--text);
+  min-height: 100vh;
+  padding: 1.5rem 1rem 4rem;
+  line-height: 1.5;
+}
+
+/* Grid overlay */
+body::before {
+  content: '';
+  position: fixed;
+  inset: 0;
+  background-image:
+    linear-gradient(rgba(0,212,255,.03) 1px, transparent 1px),
+    linear-gradient(90deg, rgba(0,212,255,.03) 1px, transparent 1px);
+  background-size: 40px 40px;
+  pointer-events: none;
+  z-index: 0;
+}
+
+.wrap { max-width: 720px; margin: 0 auto; position: relative; z-index: 1; }
+
+/* ── Header ── */
+header { margin-bottom: 2rem; }
+
+.logo-row {
+  display: flex;
+  align-items: center;
+  gap: .75rem;
+  margin-bottom: .25rem;
+}
+
+.logo-icon {
+  width: 36px; height: 36px;
+  background: linear-gradient(135deg, var(--accent), var(--green));
+  border-radius: 8px;
+  display: flex; align-items: center; justify-content: center;
+  font-size: 1.1rem;
+  flex-shrink: 0;
+}
+
+h1 {
+  font-family: var(--mono);
+  font-size: clamp(1.1rem, 3vw, 1.4rem);
+  font-weight: 700;
+  letter-spacing: -.02em;
+  color: #e8f4ff;
+}
+
+.sub {
+  font-size: .8rem;
+  color: var(--muted);
+  margin-top: .2rem;
+  padding-left: 48px;
+}
+
+.tag {
+  display: inline-flex;
+  align-items: center;
+  gap: .4rem;
+  margin-top: .6rem;
+  font-family: var(--mono);
+  font-size: .68rem;
+  padding: 3px 10px;
+  background: rgba(0,212,255,.08);
+  border: 1px solid rgba(0,212,255,.25);
+  border-radius: 4px;
+  color: var(--accent);
+  margin-left: 48px;
+}
+
+.tag::before {
+  content: '●';
+  color: var(--green);
+  font-size: .5rem;
+  animation: blink 2s step-end infinite;
+}
+
+@keyframes blink { 50% { opacity: 0; } }
+
+/* ── Alert box ── */
+.alert {
+  background: rgba(0,229,160,.06);
+  border: 1px solid rgba(0,229,160,.2);
+  border-left: 3px solid var(--green);
+  border-radius: 6px;
+  padding: .75rem 1rem;
+  font-size: .8rem;
+  color: #a0d8c0;
+  margin-bottom: 1.25rem;
+  line-height: 1.6;
+}
+
+.alert strong { color: var(--green); }
+
+/* ── Controls ── */
+.controls {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: .75rem;
+  margin-bottom: 1rem;
+}
+
+@media (max-width: 480px) { .controls { grid-template-columns: 1fr; } }
+
+.ctrl {
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  padding: .9rem 1rem;
+  transition: border-color .2s;
+}
+
+.ctrl:hover { border-color: var(--border2); }
+
+.ctrl-label {
+  font-family: var(--mono);
+  font-size: .62rem;
+  color: var(--muted);
+  text-transform: uppercase;
+  letter-spacing: .1em;
+  margin-bottom: .5rem;
+  display: block;
+}
+
+.ctrl-row { display: flex; align-items: center; gap: .75rem; }
+
+input[type=range] {
+  flex: 1;
+  -webkit-appearance: none;
+  height: 3px;
+  background: var(--border2);
+  border-radius: 2px;
+  outline: none;
+}
+
+input[type=range]::-webkit-slider-thumb {
+  -webkit-appearance: none;
+  width: 16px; height: 16px;
+  border-radius: 50%;
+  background: var(--accent);
+  cursor: pointer;
+  box-shadow: 0 0 8px rgba(0,212,255,.4);
+  transition: box-shadow .15s;
+}
+
+input[type=range]::-webkit-slider-thumb:hover {
+  box-shadow: 0 0 14px rgba(0,212,255,.7);
+}
+
+.ctrl-val {
+  font-family: var(--mono);
+  font-size: .9rem;
+  font-weight: 700;
+  color: #e8f4ff;
+  min-width: 56px;
+  text-align: right;
+}
+
+.stat-big { font-family: var(--mono); font-size: 1.25rem; font-weight: 700; color: #e8f4ff; }
+.stat-sub { font-size: .7rem; color: var(--muted); margin-top: 2px; }
+
+/* ── GPS Toggle ── */
+.gps-row {
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  padding: .85rem 1rem;
+  margin-bottom: .75rem;
+  cursor: pointer;
+  transition: border-color .2s, background .2s;
+  display: flex;
+  align-items: center;
+  gap: .85rem;
+  user-select: none;
+}
+
+.gps-row:hover { border-color: rgba(0,229,160,.3); }
+.gps-row.active { border-color: rgba(0,229,160,.5); background: rgba(0,229,160,.04); }
+
+.gps-toggle-box {
+  width: 38px; height: 22px;
+  background: var(--border2);
+  border-radius: 11px;
+  position: relative;
+  transition: background .2s;
+  flex-shrink: 0;
+}
+
+.gps-row.active .gps-toggle-box { background: var(--green); }
+
+.gps-toggle-box::after {
+  content: '';
+  position: absolute;
+  top: 3px; left: 3px;
+  width: 16px; height: 16px;
+  border-radius: 50%;
+  background: white;
+  transition: transform .2s;
+}
+
+.gps-row.active .gps-toggle-box::after { transform: translateX(16px); }
+
+.gps-text { flex: 1; }
+.gps-title { font-size: .85rem; font-weight: 600; color: #e8f4ff; }
+.gps-desc  { font-size: .72rem; color: var(--muted); margin-top: 1px; }
+
+.gps-badge {
+  font-family: var(--mono);
+  font-size: .65rem;
+  padding: 2px 8px;
+  background: rgba(0,229,160,.12);
+  color: var(--green);
+  border: 1px solid rgba(0,229,160,.3);
+  border-radius: 4px;
+  white-space: nowrap;
+}
+
+/* GPS info */
+.gps-info {
+  background: rgba(0,229,160,.04);
+  border: 1px solid rgba(0,229,160,.15);
+  border-radius: 8px;
+  padding: .85rem 1rem;
+  font-size: .78rem;
+  color: #90c8a8;
+  margin-bottom: .75rem;
+  line-height: 1.7;
+  display: none;
+}
+
+.gps-info.show { display: block; }
+.gps-info strong { color: var(--green); }
+.gps-info code { font-family: var(--mono); font-size: .72rem; background: rgba(0,0,0,.3); padding: 1px 5px; border-radius: 3px; }
+
+/* ── Accuracy strip ── */
+.acc-strip {
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  padding: .9rem 1rem;
+  margin-bottom: 1rem;
+}
+
+.acc-top {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  margin-bottom: .6rem;
+  gap: 1rem;
+}
+
+.acc-left .acc-label {
+  font-family: var(--mono);
+  font-size: .62rem;
+  color: var(--muted);
+  text-transform: uppercase;
+  letter-spacing: .1em;
+}
+
+.acc-value {
+  font-family: var(--mono);
+  font-size: 1.4rem;
+  font-weight: 700;
+  margin-top: 3px;
+}
+
+.acc-staleness { font-size: .72rem; color: var(--muted); margin-top: 2px; }
+
+.acc-legend {
+  display: flex;
+  flex-wrap: wrap;
+  gap: .5rem .9rem;
+}
+
+.acc-legend span {
+  display: flex;
+  align-items: center;
+  gap: 5px;
+  font-size: .68rem;
+  color: var(--muted);
+}
+
+.dot { width: 7px; height: 7px; border-radius: 50%; flex-shrink: 0; }
+
+/* ── Table ── */
+.tbl-wrap {
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  overflow: hidden;
+}
+
+/* Desktop table */
+.tbl-head {
+  display: grid;
+  grid-template-columns: 1.5fr 1.5fr 1.5fr 1.5fr 2fr;
+  background: rgba(0,0,0,.3);
+  border-bottom: 1px solid var(--border);
+  padding: .55rem .9rem;
+}
+
+.tbl-head span {
+  font-family: var(--mono);
+  font-size: .6rem;
+  color: var(--muted);
+  text-transform: uppercase;
+  letter-spacing: .08em;
+  text-align: right;
+}
+
+.tbl-head span:first-child { text-align: left; }
+
+.tbl-row {
+  display: grid;
+  grid-template-columns: 1.5fr 1.5fr 1.5fr 1.5fr 2fr;
+  padding: .6rem .9rem;
+  border-bottom: 1px solid var(--border);
+  transition: background .15s;
+  align-items: center;
+}
+
+.tbl-row:last-child { border-bottom: none; }
+.tbl-row:hover { background: rgba(255,255,255,.02); }
+.tbl-row.hl { background: rgba(0,212,255,.05); }
+.tbl-row.hl:hover { background: rgba(0,212,255,.08); }
+
+.tbl-row .c { text-align: right; font-size: .82rem; }
+.tbl-row .c:first-child { text-align: left; }
+
+.tbl-row .c.ops {
+  font-family: var(--mono);
+  font-weight: 700;
+  font-size: .85rem;
+  color: #e8f4ff;
+}
+
+.badge-you {
+  font-size: .58rem;
+  padding: 1px 5px;
+  background: rgba(0,212,255,.15);
+  color: var(--accent);
+  border: 1px solid rgba(0,212,255,.3);
+  border-radius: 3px;
+  margin-left: 4px;
+  font-family: var(--mono);
+  vertical-align: middle;
+}
+
+.ok   { color: var(--green); }
+.warn { color: var(--orange); }
+.dim  { color: var(--muted); font-size: .75rem; }
+
+/* Accuracy bar inline */
+.acc-bar-wrap { display: flex; align-items: center; justify-content: flex-end; gap: 5px; }
+.acc-bar { height: 5px; border-radius: 3px; flex-shrink: 0; }
+
+/* Mobile: card layout */
+@media (max-width: 520px) {
+  .tbl-head { display: none; }
+  .tbl-wrap { background: transparent; border: none; }
+  .tbl-row {
+    grid-template-columns: 1fr 1fr;
+    grid-template-rows: auto auto auto;
+    border-radius: 8px;
+    border: 1px solid var(--border) !important;
+    margin-bottom: .5rem;
+    background: var(--surface);
+    padding: .75rem .9rem;
+    gap: .2rem .5rem;
   }
-  .wrap { max-width: 1020px; margin: 0 auto; }
-  header { margin-bottom: 2rem; }
-  header h1 { font-size: 1.5rem; font-weight: 500; }
-  header p { font-size: 0.875rem; color: #8b949e; margin-top: 0.25rem; }
-  .badge {
-    display: inline-block; margin-top: 0.5rem;
-    font-size: 0.75rem; padding: 2px 10px;
-    background: #1f2937; border: 1px solid #374151;
-    border-radius: 20px; color: #60a5fa;
+  .tbl-row .c { text-align: left !important; justify-content: flex-start; }
+  .tbl-row .c.ops {
+    grid-column: 1 / -1;
+    border-bottom: 1px solid var(--border);
+    padding-bottom: .4rem;
+    margin-bottom: .2rem;
+    font-size: .95rem;
   }
-  .controls {
-    display: grid; grid-template-columns: 1fr 1fr 1fr;
-    gap: 1rem; margin-bottom: 1rem;
-  }
-  @media (max-width: 640px) { .controls { grid-template-columns: 1fr; } }
-  .ctrl {
-    background: #161b22; border: 1px solid #30363d;
-    border-radius: 8px; padding: 1rem;
-  }
-  .ctrl label {
-    display: block; font-size: 0.7rem; color: #8b949e;
-    text-transform: uppercase; letter-spacing: 0.06em; margin-bottom: 0.5rem;
-  }
-  .ctrl-row { display: flex; align-items: center; gap: 10px; }
-  input[type=range] {
-    flex: 1; -webkit-appearance: none; height: 4px;
-    background: #30363d; border-radius: 2px; outline: none;
-  }
-  input[type=range]::-webkit-slider-thumb {
-    -webkit-appearance: none; width: 16px; height: 16px;
-    border-radius: 50%; background: #1f6feb; cursor: pointer;
-  }
-  .val { font-size: 1rem; font-weight: 500; min-width: 64px; text-align: right; }
-  .stat { font-size: 1.4rem; font-weight: 500; }
-  .stat-sub { font-size: 0.72rem; color: #8b949e; margin-top: 3px; }
-  .mode-btns { display: flex; gap: 10px; margin-top: 4px; }
-  .mode-btns label {
-    display: flex; align-items: center; gap: 6px;
-    font-size: 0.875rem; color: #e6edf3;
-    text-transform: none; letter-spacing: 0; cursor: pointer;
-  }
-  .note {
-    background: #161b22; border-left: 3px solid #1f6feb;
-    border-radius: 6px; padding: 0.75rem 1rem;
-    font-size: 0.8rem; color: #8b949e; margin-bottom: 1.5rem; line-height: 1.6;
-  }
-  .note strong { color: #60a5fa; }
-  table {
-    width: 100%; border-collapse: collapse; font-size: 0.8rem;
-    background: #161b22; border: 1px solid #30363d;
-    border-radius: 8px; overflow: hidden;
-  }
-  thead tr { background: #21262d; }
-  th {
-    padding: 9px 11px; text-align: right;
-    font-weight: 500; color: #8b949e;
-    font-size: 0.68rem; text-transform: uppercase; letter-spacing: 0.05em;
-  }
-  th:first-child { text-align: left; }
-  td { padding: 9px 11px; text-align: right; border-top: 1px solid #21262d; }
-  td:first-child { text-align: left; font-weight: 500; color: #e6edf3; }
-  tr.hl { background: #0d2136; }
-  tr.hl td { color: #60a5fa; }
-  tr:hover { background: #1c2128; }
-  .warn { color: #f97316; }
-  .ok { color: #3fb950; }
-  .dim { color: #8b949e; }
-  .tag {
-    font-size: 0.65rem; padding: 1px 5px;
-    background: #1f6feb22; color: #60a5fa;
-    border: 1px solid #1f6feb44; border-radius: 8px; margin-left: 4px;
-    vertical-align: middle;
-  }
-  .accuracy-bar {
-    display: inline-block; height: 6px; border-radius: 3px; vertical-align: middle;
-    margin-right: 5px;
-  }
-  footer { margin-top: 2rem; font-size: 0.75rem; color: #484f58; text-align: center; }
-  footer a { color: #1f6feb; text-decoration: none; }
-  .legend {
-    display: flex; gap: 16px; flex-wrap: wrap;
-    margin-bottom: 0.75rem; font-size: 0.72rem; color: #8b949e;
-    align-items: center;
-  }
-  .legend span { display: flex; align-items: center; gap: 5px; }
+  .tbl-row .c.xnt::before  { content: "XNT/mo: "; color: var(--muted); font-size: .68rem; }
+  .tbl-row .c.usd::before  { content: "USD/mo: "; color: var(--muted); font-size: .68rem; }
+  .tbl-row .c.run::before  { content: "Runway: "; color: var(--muted); font-size: .68rem; }
+  .tbl-row .c.acc          { grid-column: 1 / -1; }
+  .tbl-row .c.acc::before  { content: "Accuracy: "; color: var(--muted); font-size: .68rem; }
+  .acc-bar-wrap { justify-content: flex-start; }
+}
+
+footer {
+  margin-top: 2rem;
+  font-size: .72rem;
+  color: var(--muted);
+  text-align: center;
+  font-family: var(--mono);
+}
+
+footer a { color: var(--accent); text-decoration: none; opacity: .8; }
+footer a:hover { opacity: 1; }
 </style>
 </head>
 <body>
 <div class="wrap">
-  <header>
-    <h1>⚛️ X1 Strontium — Cost Calculator</h1>
-    <p>Decentralized time oracle for X1 blockchain</p>
-    <span class="badge">fee: 0.002 XNT / tx — verified on-chain</span>
-  </header>
 
-  <div class="note">
-    <strong>Solo mode:</strong> each server submits independently — costs multiply by N.&nbsp;&nbsp;
-    <strong>Committee mode:</strong> round-robin rotation — total network cost = 1 solo server. Table shows cost <em>per operator</em> (total ÷ N).
+<header>
+  <div class="logo-row">
+    <div class="logo-icon">⚛</div>
+    <h1>X1 Strontium</h1>
   </div>
+  <p class="sub">Decentralized time oracle — cost calculator</p>
+  <span class="tag">fee: 0.002 XNT / tx — verified on-chain</span>
+</header>
 
-  <div class="controls">
-    <div class="ctrl">
-      <label>Submit interval</label>
-      <div class="ctrl-row">
-        <input type="range" id="interval" min="60" max="3600" step="60" value="300">
-        <span class="val" id="interval-out">5 min</span>
-      </div>
-    </div>
-    <div class="ctrl">
-      <label>XNT price (USD)</label>
-      <div class="ctrl-row">
-        <input type="range" id="price" min="0.01" max="10" step="0.01" value="0.44">
-        <span class="val" id="price-out">$0.44</span>
-      </div>
-    </div>
-    <div class="ctrl">
-      <label>Your oracle balance (XNT)</label>
-      <div class="ctrl-row">
-        <input type="range" id="balance" min="1" max="100" step="1" value="10">
-        <span class="val" id="balance-out">10 XNT</span>
-      </div>
-    </div>
-    <div class="ctrl">
-      <label>Tx/day (single server)</label>
-      <div class="stat" id="txday">288</div>
-      <div class="stat-sub" id="txday-sub">@ 5 min interval</div>
-    </div>
-    <div class="ctrl">
-      <label>Mode</label>
-      <div class="mode-btns">
-        <label><input type="radio" name="mode" value="solo" checked> Solo</label>
-        <label><input type="radio" name="mode" value="committee"> Committee</label>
-      </div>
-      <div class="stat-sub" id="mode-desc" style="margin-top:6px;">each server submits independently</div>
-    </div>
-    <div class="ctrl">
-      <label>On-chain time accuracy</label>
-      <div class="stat" id="accuracy-val">±3–10 ms</div>
-      <div class="stat-sub" id="staleness-val">max staleness: 5 min</div>
+<div class="alert">
+  <strong>Auto-rotation:</strong> validators register once and start. The daemon automatically discovers active oracles on-chain and distributes submissions evenly — <strong>no manual configuration needed</strong>. As more operators join, cost per operator drops automatically.
+</div>
+
+<div class="controls">
+  <div class="ctrl">
+    <span class="ctrl-label">Submit interval</span>
+    <div class="ctrl-row">
+      <input type="range" id="interval" min="30" max="3600" step="30" value="300">
+      <span class="ctrl-val" id="interval-out">5 min</span>
     </div>
   </div>
-
-  <div class="legend">
-    <span>Accuracy:</span>
-    <span><span class="accuracy-bar" style="width:32px;background:#3fb950"></span> excellent (&lt;2ms)</span>
-    <span><span class="accuracy-bar" style="width:32px;background:#60a5fa"></span> good (2–6ms)</span>
-    <span><span class="accuracy-bar" style="width:32px;background:#f0883e"></span> acceptable (6–15ms)</span>
-    <span><span class="accuracy-bar" style="width:32px;background:#f85149"></span> degraded (&gt;15ms)</span>
+  <div class="ctrl">
+    <span class="ctrl-label">XNT price (USD)</span>
+    <div class="ctrl-row">
+      <input type="range" id="price" min="0.01" max="10" step="0.01" value="0.44">
+      <span class="ctrl-val" id="price-out">$0.44</span>
+    </div>
   </div>
+  <div class="ctrl">
+    <span class="ctrl-label">Oracle balance (XNT)</span>
+    <div class="ctrl-row">
+      <input type="range" id="balance" min="1" max="100" step="1" value="10">
+      <span class="ctrl-val" id="balance-out">10 XNT</span>
+    </div>
+  </div>
+  <div class="ctrl">
+    <span class="ctrl-label">TX/day (single server)</span>
+    <div class="stat-big" id="txday">288</div>
+    <div class="stat-sub" id="txday-sub">@ 5 min interval</div>
+  </div>
+</div>
 
-  <table>
-    <thead>
-      <tr>
-        <th>operators</th>
-        <th>tx/day/op</th>
-        <th>XNT/month/op</th>
-        <th>$/month/op</th>
-        <th>runway</th>
-        <th>max staleness</th>
-        <th>on-chain accuracy</th>
-      </tr>
-    </thead>
-    <tbody id="tbody"></tbody>
-  </table>
+<!-- GPS Toggle -->
+<div class="gps-row" id="gps-row" onclick="toggleGps()">
+  <div class="gps-toggle-box" id="gps-box"></div>
+  <div class="gps-text">
+    <div class="gps-title">GPS/PPS hardware</div>
+    <div class="gps-desc">u-blox NEO-M8N ~$50/server · auto-detected at <code>/dev/pps0</code></div>
+  </div>
+  <span class="gps-badge">±50 ns</span>
+</div>
 
-  <footer>
-    <p>Source: <a href="https://github.com/PioWin-clo/strontium">github.com/PioWin-clo/strontium</a>
-    &nbsp;·&nbsp; fee verified in <code>submitter.rs</code> &nbsp;·&nbsp;
-    <a href="https://explorer.mainnet.x1.xyz/address/EtjkQqf1h9gtwHpi2QPRTefWg3XmDfmjQ6YozYZspJzn">oracle PDA</a>
-    </p>
-  </footer>
+<div class="gps-info" id="gps-info">
+  <strong>GPS/PPS enabled → ±50 nanoseconds</strong> — 40,000× better than NTP alone.<br>
+  A $30–50 USB module provides a hardware pulse-per-second signal to the server. Linux chrony uses it as a stratum-0 reference. Strontium detects <code>/dev/pps0</code> automatically — no code changes needed.<br>
+  Required for sub-millisecond DeFi, eigenvm τₖ phase-lock consensus, and MEV-resistant auctions.
+</div>
+
+<!-- Accuracy -->
+<div class="acc-strip">
+  <div class="acc-top">
+    <div class="acc-left">
+      <div class="acc-label">On-chain time accuracy</div>
+      <div class="acc-value" id="acc-val">±2–6 ms</div>
+      <div class="acc-staleness" id="acc-sub">max staleness: 5 min</div>
+    </div>
+    <div class="acc-legend">
+      <span><span class="dot" style="background:#00e5a0"></span>excellent &lt;2ms</span>
+      <span><span class="dot" style="background:#00d4ff"></span>good 2–6ms</span>
+      <span><span class="dot" style="background:#ff8c42"></span>ok 6–15ms</span>
+      <span><span class="dot" style="background:#ff4466"></span>poor &gt;15ms</span>
+    </div>
+  </div>
+</div>
+
+<!-- Table -->
+<div class="tbl-wrap">
+  <div class="tbl-head">
+    <span>operators</span>
+    <span>XNT/month</span>
+    <span>$/month</span>
+    <span>runway</span>
+    <span>accuracy</span>
+  </div>
+  <div id="tbody"></div>
+</div>
+
+<footer>
+  <a href="https://github.com/PioWin-clo/strontium">github.com/PioWin-clo/strontium</a>
+  &nbsp;·&nbsp;
+  fee verified in <code>submitter.rs</code>
+  &nbsp;·&nbsp;
+  <a href="https://explorer.mainnet.x1.xyz/address/EtjkQqf1h9gtwHpi2QPRTefWg3XmDfmjQ6YozYZspJzn">oracle PDA</a>
+</footer>
+
 </div>
 
 <script>
-const FEE = 0.002;
-const SERVERS = [1, 2, 3, 5, 10, 50, 100, 500, 1000];
-const HL = 2;
+const FEE  = 0.002;
+const OPS  = [1, 2, 3, 5, 10, 50, 100, 500, 1000];
+const HL   = 2;
+let gpsOn  = false;
 
-// Dokładność on-chain: zależy od interwału i liczby operatorów
-// Im krótszy interwał i więcej operatorów, tym świeższy timestamp
-function getAccuracy(intervalS, nOps, mode) {
-  // Efektywny interwał aktualizacji on-chain
-  const effectiveInterval = mode === 'committee' ? intervalS : intervalS;
-  // więcej ops w committee = więcej submissions ale nie szybsza aktualizacja
-  // Dokładność NTP: ~1-5ms przy stratum-1, spread ±50ms threshold
-  if (effectiveInterval <= 60)  return { label: '±1–3 ms',  color: '#3fb950', bar: 90 };
-  if (effectiveInterval <= 120) return { label: '±1–4 ms',  color: '#3fb950', bar: 80 };
-  if (effectiveInterval <= 300) return { label: '±2–6 ms',  color: '#60a5fa', bar: 65 };
-  if (effectiveInterval <= 600) return { label: '±3–8 ms',  color: '#60a5fa', bar: 50 };
-  if (effectiveInterval <= 900) return { label: '±4–10 ms', color: '#f0883e', bar: 35 };
-  return                               { label: '±5–15 ms', color: '#f0883e', bar: 22 };
+function toggleGps() {
+  gpsOn = !gpsOn;
+  document.getElementById('gps-row').classList.toggle('active', gpsOn);
+  document.getElementById('gps-box').classList.toggle('active', gpsOn);
+  document.getElementById('gps-info').classList.toggle('show', gpsOn);
+  update();
 }
 
-function staleness(intervalS, nOps, mode) {
-  // Max staleness = interwał (w committee każdy submituje co interval*n ale pokrycie jest co interval)
-  const secs = intervalS;
-  if (secs < 60)  return secs + 's';
-  if (secs < 3600) return (secs/60).toFixed(0) + ' min';
-  return (secs/3600).toFixed(1) + 'h';
+function accuracy(intervalS, gps) {
+  if (gps) return { label: '±50 ns', color: '#00e5a0', bar: 100 };
+  if (intervalS <=   30) return { label: '±1–2 ms',  color: '#00e5a0', bar: 95 };
+  if (intervalS <=   60) return { label: '±1–3 ms',  color: '#00e5a0', bar: 88 };
+  if (intervalS <=  120) return { label: '±1–4 ms',  color: '#00e5a0', bar: 80 };
+  if (intervalS <=  300) return { label: '±2–6 ms',  color: '#00d4ff', bar: 65 };
+  if (intervalS <=  600) return { label: '±3–8 ms',  color: '#00d4ff', bar: 50 };
+  if (intervalS <=  900) return { label: '±4–10 ms', color: '#ff8c42', bar: 35 };
+  return                        { label: '±5–15 ms', color: '#ff8c42', bar: 22 };
 }
 
-function runway(bal, costPerDay) {
-  if (!costPerDay) return '∞';
-  const d = bal / costPerDay;
-  if (d < 1)   return '<1 day';
-  if (d < 30)  return Math.round(d) + ' days';
+function staleness(s) {
+  if (s < 60)   return s + 's';
+  if (s < 3600) return (s/60).toFixed(0) + ' min';
+  return (s/3600).toFixed(1) + 'h';
+}
+
+function runway(bal, xntPerDay) {
+  if (!xntPerDay) return '∞';
+  const d = bal / xntPerDay;
+  if (d <   1) return '<1 day';
+  if (d <  30) return Math.round(d) + ' days';
   if (d < 365) return (d/30).toFixed(1) + ' mo';
   return (d/365).toFixed(1) + ' yr';
 }
 
-function runwayColor(bal, costPerDay) {
-  if (!costPerDay) return '';
-  const d = bal / costPerDay;
+function runwayClass(bal, xntPerDay) {
+  if (!xntPerDay) return 'ok';
+  const d = bal / xntPerDay;
   if (d < 7)  return 'warn';
-  if (d < 30) return '';
-  return 'ok';
+  if (d > 30) return 'ok';
+  return '';
 }
 
 function update() {
-  const intS    = +document.getElementById('interval').value;
-  const price   = +document.getElementById('price').value;
-  const balance = +document.getElementById('balance').value;
-  const mode    = document.querySelector('input[name=mode]:checked').value;
-  const comm    = mode === 'committee';
+  const intS  = +document.getElementById('interval').value;
+  const price = +document.getElementById('price').value;
+  const bal   = +document.getElementById('balance').value;
 
+  // Labels
   const mins = intS / 60;
-  const intLabel = mins >= 60 ? (mins/60).toFixed(0) + 'h' : mins.toFixed(0) + ' min';
+  const intLabel = intS < 60 ? intS + 's' : mins >= 60 ? (mins/60).toFixed(0)+'h' : mins.toFixed(0)+' min';
   document.getElementById('interval-out').textContent = intLabel;
-  document.getElementById('price-out').textContent = '$' + price.toFixed(2);
-  document.getElementById('balance-out').textContent = balance + ' XNT';
+  document.getElementById('price-out').textContent    = '$' + price.toFixed(2);
+  document.getElementById('balance-out').textContent  = bal + ' XNT';
 
-  const txSolo = Math.round(86400 / intS);
-  document.getElementById('txday').textContent = txSolo.toLocaleString();
+  const txSolo = 86400 / intS;
+  document.getElementById('txday').textContent     = Math.round(txSolo).toLocaleString();
   document.getElementById('txday-sub').textContent = '@ ' + intLabel + ' interval';
-  document.getElementById('mode-desc').textContent = comm
-    ? 'cost shown per operator (total ÷ N)'
-    : 'each server submits independently';
 
-  // Globalny wskaźnik dokładności (dla aktualnego interwału, solo)
-  const acc = getAccuracy(intS, 1, mode);
-  document.getElementById('accuracy-val').textContent = acc.label;
-  document.getElementById('accuracy-val').style.color = acc.color;
-  document.getElementById('staleness-val').textContent = 'max staleness: ' + staleness(intS, 1, mode);
+  // Global accuracy
+  const acc = accuracy(intS, gpsOn);
+  document.getElementById('acc-val').textContent  = acc.label;
+  document.getElementById('acc-val').style.color  = acc.color;
+  document.getElementById('acc-sub').textContent  = 'max staleness: ' + staleness(intS);
 
+  // Table
   const tbody = document.getElementById('tbody');
   tbody.innerHTML = '';
 
-  SERVERS.forEach(n => {
-    const txPerOp  = comm ? txSolo / n : txSolo;
-    const xntDay   = FEE * txPerOp;
-    const xntMon   = xntDay * 30;
-    const usdMon   = xntMon * price;
-    const rw       = runway(balance, xntDay);
-    const rwColor  = runwayColor(balance, xntDay);
-    const isHl     = n === HL;
-    const bigWarn  = !comm && n >= 500;
-    const accRow   = getAccuracy(intS, n, mode);
-    const stale    = staleness(intS, n, mode);
+  OPS.forEach(n => {
+    const txPerOp   = txSolo / n;
+    const xntPerDay = txPerOp * FEE;
+    const xntPerMon = xntPerDay * 30;
+    const usdPerMon = xntPerMon * price;
+    const rw        = runway(bal, xntPerDay);
+    const rwCls     = runwayClass(bal, xntPerDay);
+    const accRow    = accuracy(intS, gpsOn);
+    const isHl      = n === HL;
+    const barW      = Math.round(accRow.bar * 0.6);
 
-    let firstCell = n.toLocaleString();
-    if (isHl)         firstCell += ' <span class="tag">your setup</span>';
-    if (comm && n > 1) firstCell += ' <span class="tag">shared</span>';
-
-    const w = bigWarn ? 'warn' : '';
-    const txDisp = txPerOp % 1 === 0
-      ? txPerOp.toLocaleString()
-      : txPerOp.toFixed(1);
-
-    tbody.innerHTML += `<tr class="${isHl ? 'hl' : ''}">
-      <td>${firstCell}</td>
-      <td class="${w}">${txDisp}</td>
-      <td class="${w}">${xntMon.toFixed(3)}</td>
-      <td class="${w}" style="font-weight:500">$${usdMon.toFixed(2)}</td>
-      <td class="${rwColor}" style="font-weight:500">${rw}</td>
-      <td class="dim">${stale}</td>
-      <td><span class="accuracy-bar" style="width:${accRow.bar * 0.28}px;background:${accRow.color}"></span><span style="color:${accRow.color}">${accRow.label}</span></td>
-    </tr>`;
+    const row = document.createElement('div');
+    row.className = 'tbl-row' + (isHl ? ' hl' : '');
+    row.innerHTML = `
+      <div class="c ops">${n.toLocaleString()}${isHl ? '<span class="badge-you">you</span>' : ''}</div>
+      <div class="c xnt">${xntPerMon.toFixed(3)}</div>
+      <div class="c usd" style="font-weight:500">$${usdPerMon.toFixed(2)}</div>
+      <div class="c run ${rwCls}">${rw}</div>
+      <div class="c acc">
+        <div class="acc-bar-wrap">
+          <span class="acc-bar" style="width:${barW}px;background:${accRow.color}"></span>
+          <span style="color:${accRow.color};font-size:.78rem;font-family:var(--mono)">${accRow.label}</span>
+        </div>
+      </div>`;
+    tbody.appendChild(row);
   });
 }
 
 ['interval','price','balance'].forEach(id =>
   document.getElementById(id).addEventListener('input', update));
-document.querySelectorAll('input[name=mode]').forEach(r =>
-  r.addEventListener('change', update));
+
 update();
 </script>
 </body>
