@@ -284,17 +284,18 @@ fn run_daemon(config: StrontiumConfig) {
             println!("[{}] 🔄 Fallback: {}", now_str(), decision.reason);
         }
 
-        // Outlier check — compare NTP consensus with chain clock
-        const OUTLIER_THRESHOLD_MS: i64 = 10_000; // 10 seconds
-        if let Some(chain_ms) = get_chain_time_ms(&mut rpc) {
-            let drift = (consensus.timestamp_ms - chain_ms).abs();
-            if drift > OUTLIER_THRESHOLD_MS {
-                eprintln!("[{}] ✗ Timestamp outlier: NTP {}ms vs chain {}ms (drift={}ms)",
-                    now_str(), consensus.timestamp_ms, chain_ms, drift);
-                update_status_silent(SilentReason::TimestampOutlier, balance_xnt, days_left, &config, &oracle_pubkey);
-                thread::sleep(Duration::from_secs(config.interval_s));
-                continue;
-            }
+        // Outlier check — compare NTP consensus with local system clock
+        // NOTE: We do NOT compare against chain clock — chain clock drifts and
+        // is exactly what Strontium is designed to correct.
+        const OUTLIER_THRESHOLD_MS: i64 = 5_000; // 5 seconds from system clock
+        let sys_ms = unix_ms();
+        let sys_drift = (consensus.timestamp_ms - sys_ms).abs();
+        if sys_drift > OUTLIER_THRESHOLD_MS {
+            eprintln!("[{}] ✗ Timestamp outlier: NTP {}ms vs system {}ms (drift={}ms)",
+                now_str(), consensus.timestamp_ms, sys_ms, sys_drift);
+            update_status_silent(SilentReason::TimestampOutlier, balance_xnt, days_left, &config, &oracle_pubkey);
+            thread::sleep(Duration::from_secs(config.interval_s));
+            continue;
         }
 
         // Get recent blockhash and send

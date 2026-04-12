@@ -213,6 +213,8 @@ pub enum StrontiumError {
     RegistrationExpired,
     #[msg("Too early to renew — renew within 7 days of expiry")]
     TooEarlyToRenew,
+    #[msg("Timestamp deviates >10s from on-chain clock — possible manipulation")]
+    TimestampOutlier,
 }
 
 #[derive(Accounts)]
