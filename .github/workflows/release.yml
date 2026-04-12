@@ -4,6 +4,9 @@ on:
   push:
     branches: [ main ]
 
+permissions:
+  contents: write
+
 jobs:
   build:
     name: Build static binary (Linux x86_64)
@@ -44,7 +47,7 @@ jobs:
         id: version
         run: |
           VERSION=$(grep '^version' daemon/Cargo.toml | head -1 | cut -d'"' -f2)
-          SHORT_SHA=$(echo ${{ github.sha }} | cut -c1-7)
+          SHORT_SHA=$(echo $GITHUB_SHA | cut -c1-7)
           echo "tag=v${VERSION}-${SHORT_SHA}" >> $GITHUB_OUTPUT
           echo "name=X1 Strontium v${VERSION} (${SHORT_SHA})" >> $GITHUB_OUTPUT
 
