@@ -3,9 +3,6 @@ name: Release
 on:
   push:
     branches: [ main ]
-    paths:
-      - 'src/**'
-      - 'daemon/**'
 
 jobs:
   build:
