@@ -44,9 +44,9 @@ pub struct StrontiumConfig {
     /// Set to false for lower compute units in production
     pub memo_enabled: bool,
 
-    /// Committee: sorted list of oracle pubkeys for rotation
-    /// Empty = solo mode (always my turn)
-    pub committee: Vec<String>,
+    /// Auto-rotation: daemon discovers active oracles from chain
+    /// false = always submit (solo, for testing)
+    pub rotation_enabled: bool,
 }
 
 impl Default for StrontiumConfig {
@@ -65,7 +65,7 @@ impl Default for StrontiumConfig {
             alert_webhook: None,
             alert_balance_threshold: 1.0,
             dry_run: false,
-            committee: vec![],
+            rotation_enabled: true,
             memo_enabled: true,
             tier_consensus_threshold_ms: 60,
         }
@@ -126,15 +126,8 @@ impl StrontiumConfig {
             "dry_run" => {
                 self.dry_run = value == "true" || value == "1";
             }
-            "committee" => {
-                // Add a pubkey to committee list
-                if !self.committee.contains(&value.to_string()) {
-                    self.committee.push(value.to_string());
-                    self.committee.sort();
-                }
-            }
-            "committee_clear" => {
-                self.committee.clear();
+            "rotation" | "rotation_enabled" => {
+                self.rotation_enabled = value == "true" || value == "1";
             }
             "tier_threshold" | "tier_consensus_threshold_ms" => {
                 self.tier_consensus_threshold_ms = value.parse::<i64>()
@@ -166,14 +159,7 @@ impl StrontiumConfig {
         println!("  dry_run        : {}", self.dry_run);
         println!("  memo_enabled   : {}", self.memo_enabled);
         println!("  tier_threshold : {}ms (cross-tier consensus)", self.tier_consensus_threshold_ms);
-        if !self.committee.is_empty() {
-            println!("  committee      : {} oracles", self.committee.len());
-            for (i, p) in self.committee.iter().enumerate() {
-                println!("    [{}] {}", i, p);
-            }
-        } else {
-            println!("  committee      : solo mode");
-        }
+        println!("  rotation       : {}", if self.rotation_enabled { "enabled (auto)" } else { "disabled (solo)" });
     }
 }
 

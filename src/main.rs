@@ -11,7 +11,9 @@ use std::time::{Duration, SystemTime, UNIX_EPOCH};
 use config::{StrontiumConfig, ORACLE_PDA};
 use status::{DaemonStatus, SilentReason};
 use ntp_client::{discover_sources, query_sources_parallel, has_gps_pps, dedup_sources};
-use consensus::{run_consensus_cycle, rotation_my_turn, window_has_submission};
+use consensus::run_consensus_cycle;
+mod rotation;
+use rotation::{RotationState, OracleRole};
 use submitter::{RpcClient, build_submit_transaction, SubmitParams, derive_registration_pda,
                 lamports_to_xnt, estimate_days_remaining, get_chain_time_ms};
 use register::{run_register, load_keypair};
@@ -111,6 +113,7 @@ fn run_daemon(config: StrontiumConfig) {
 
     // Initialize RPC client
     let mut rpc = RpcClient::new(config.rpc_urls.clone());
+    let mut rotation_state = RotationState::new();
 
     // Readiness check — wait until validator is active
     if !config.dry_run {
@@ -204,7 +207,8 @@ fn run_daemon(config: StrontiumConfig) {
 
         // Liveness tracking — oblicz expected turns per 24h
         {
-            let turns_per_day = 86400u64 / config.interval_s / if config.committee.is_empty() { 1 } else { config.committee.len() } as u64;
+            let n_active = rotation_state.active_oracles.len().max(1);
+            let turns_per_day = 86400u64 / config.interval_s / n_active as u64;
             let mut st = DaemonStatus::load();
             st.expected_turns_24h = turns_per_day;
             // Reset licznika co 24h
@@ -227,46 +231,57 @@ fn run_daemon(config: StrontiumConfig) {
             st.save();
         }
 
-        // Rotation check — is it my turn?
-        // committee = sorted list of oracle pubkeys from config
-        // Empty committee = solo mode (always my turn)
-        let n_validators = if config.committee.is_empty() { 1 } else { config.committee.len() };
-        let my_index = if config.committee.is_empty() {
-            0usize
-        } else {
-            match config.committee.iter().position(|p| p == &oracle_pubkey) {
-                Some(idx) => idx,
-                None => {
-                    // Oracle pubkey nie ma w committee — działamy w solo mode
-                    eprintln!("[warn] ⚠ Oracle pubkey {} not found in committee — running solo mode", &oracle_pubkey[..8]);
-                    eprintln!("[warn]   Add to committee: x1sr config set committee {}", oracle_pubkey);
-                    0usize
+        // Auto-rotation — slot-hash based, discovers active oracles from chain
+        let window_id  = unix_secs() / config.interval_s;
+        let elapsed_s  = unix_secs() % config.interval_s;
+
+        // Refresh oracle list from chain every 100 cycles (~inteval*100 seconds)
+        if rotation_state.last_fetch_slot == 0 ||
+           cycle_num % 100 == 0 {
+            if let Ok(submissions) = rpc.get_oracle_submissions(&config.oracle_pda) {
+                let current_slot = rpc.get_current_slot().unwrap_or(0);
+                let changed = rotation_state.refresh_from_submissions(
+                    &submissions, current_slot, 500
+                );
+                if changed {
+                    println!("[{}] 🔄 Oracle list updated: {} active oracle(s)",
+                        now_str(), rotation_state.active_oracles.len());
                 }
             }
+            if !rotation_state.rotation_active() {
+                eprintln!("[warn] rotation: active oracle set too small ({}/2 minimum) — solo mode",
+                    rotation_state.active_oracles.len());
+            }
+        }
+
+        let slot_hash = rpc.get_slot_hash().unwrap_or([0u8; 32]);
+
+        let decision = if !config.rotation_enabled {
+            rotation::SubmitDecision {
+                should_submit: true,
+                role: OracleRole::Solo,
+                reason: "rotation disabled by config".to_string(),
+            }
+        } else {
+            rotation_state.should_submit(
+                &oracle_bytes,
+                &slot_hash,
+                window_id,
+                elapsed_s,
+                30, // PRIMARY_GRACE_S
+                30, // BACKUP_GRACE_S
+            )
         };
 
-        let (is_my_turn, window_id, _) = rotation_my_turn(
-            &oracle_bytes,
-            my_index,
-            n_validators,
-            config.interval_s,
-        );
-
-        if !is_my_turn {
-            // Anti-dublet: sprawdź czy ktoś już submitował w tym oknie
-            let last_ts = {
-                let st = DaemonStatus::load();
-                st.last_submit_ts
-            };
-            if window_has_submission(last_ts, config.interval_s) {
-                // Ktoś już submitował w tym oknie — milczymy
-                println!("[{}] ⟳ Window {} already covered", now_str(), window_id);
-            } else {
-                println!("[{}] ⟳ Not my turn (rotation window {})", now_str(), window_id);
-            }
+        if !decision.should_submit {
+            println!("[{}] ⟳ {}", now_str(), decision.reason);
             update_status_silent(SilentReason::NotElected, balance_xnt, days_left, &config, &oracle_pubkey);
             thread::sleep(Duration::from_secs(config.interval_s));
             continue;
+        }
+
+        if decision.role != OracleRole::Primary && decision.role != OracleRole::Solo {
+            println!("[{}] 🔄 Fallback: {}", now_str(), decision.reason);
         }
 
         // Outlier check — compare NTP consensus with chain clock
