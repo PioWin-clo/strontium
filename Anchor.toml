@@ -1,17 +1,15 @@
-[toolchain]
-
 [features]
 resolution = true
 skip-lint = false
 
 [programs.mainnet]
-strontium = "CRJjS3f4XA44gz1XcjtFoKRC6muHvEGDPYW6CUdjtRc6"
+strontium = "2Z9ymNXMXjqMbDRj6NhPo7LLMaqdn2nfU1hvy19ScRAe"
 
 [registry]
 url = "https://api.apr.dev"
 
 [provider]
-cluster = "https://rpc.mainnet.x1.xyz"
+cluster = "mainnet"
 wallet = "~/.config/solana/id.json"
 
 [scripts]
